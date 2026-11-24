@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desi Party Games</title><link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head><body><div id="app"></div><script>
+const $ = h => (document.getElementById('app').innerHTML = h);
+const esc = s => String(s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
+const NAMES = { map: 'Map Grab: Bharat Edition', num: 'Ball Park: Desi Estimates' };
+let room, key, tick;
+const board = s => '<table>' + [...s.players].sort((a, b) => b.score - a.score).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td><b>${p.score}</b></td></tr>`).join('') + '</table>';
+const start = game => fetch('/api/start', { method: 'POST', body: JSON.stringify({ room: room.code, token: room.token, game }) });
+const picker = s => `<button onclick="start('map')" ${s.players.length ? '' : 'disabled'}>🗺️ ${NAMES.map}</button><button onclick="start('num')" ${s.players.length ? '' : 'disabled'}>🏏 ${NAMES.num}</button>`;
+
+function render(s) {
+  const k = s.phase + s.round;
+  if (k !== key) { key = k; clearInterval(tick); draw(s); }
+  const pick = document.getElementById('pick'); if (pick) pick.innerHTML = picker(s);
+  const pills = document.getElementById('pills');
+  if (pills) pills.innerHTML = s.players.map(p => `<span class="pill ${s.phase === 'question' && p.answered ? 'done' : ''}">${esc(p.name)}</span>`).join('') || 'Waiting for players…';
+}
+function draw(s) {
+  if (s.phase === 'lobby') {
+    const url = `${location.origin}/play?room=${s.code}`;
+    $(`<h1>Desi Party Games</h1><div class="card"><div id="qr" style="display:inline-block;background:#fff;padding:12px;border-radius:12px"></div>
+      <p>Scan to join, or open <b>${esc(location.host)}/play</b> and enter</p><div class="big">${s.code}</div></div>
+      <div class="card" id="pills"></div><div id="pick"></div>`);
+    new QRCode(document.getElementById('qr'), { text: url, width: 220, height: 220 });
+  } else if (s.phase === 'question') {
+    $(`<p>${NAMES[s.game]} · Round ${s.round}/${s.total}</p><div class="card big">${s.game === 'map' ? '📍 Where is ' : ''}${esc(s.prompt)}${s.game === 'map' ? '?' : (s.unit ? ` <small>(${esc(s.unit)})</small>` : '')}</div>
+      <div class="big" id="t"></div><div class="card" id="pills"></div>`);
+    tick = setInterval(() => document.getElementById('t').textContent = Math.max(0, Math.ceil((s.endsAt - Date.now()) / 1000)), 250);
+  } else if (s.phase === 'reveal') {
+    const r = s.reveal, rows = r.results.map(x => `<tr><td>${esc(x.name)}</td><td>${s.game === 'map' ? x.err + ' km off' : x.guess + ' (off by ' + x.err + ')'}</td><td>+${x.points}</td></tr>`).join('');
+    $(`<div class="card big">${s.game === 'map' ? esc(s.prompt) : 'Answer: ' + r.answer + ' ' + esc(r.unit || '')}</div>
+      ${s.game === 'map' ? '<div id="m" class="map"></div>' : ''}<div class="card"><table>${rows || '<tr><td>Nobody answered!</td></tr>'}</table></div>`);
+    if (s.game === 'map') {
+      const m = L.map('m'), pts = [[r.answer.lat, r.answer.lng]];
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(m);
+      L.circleMarker(pts[0], { radius: 12, color: '#2fb36b', fillOpacity: 1 }).addTo(m).bindTooltip('🎯 ' + s.prompt, { permanent: true });
+      r.results.forEach(x => { const p = [x.guess.lat, x.guess.lng]; pts.push(p);
+        L.marker(p).addTo(m).bindTooltip(x.name, { permanent: true }); L.polyline([pts[0], p], { color: '#ff9933', dashArray: '6' }).addTo(m); });
+      m.fitBounds(pts, { padding: [40, 40], maxZoom: 7 });
+    }
+  } else {
+    $(`<h1>🏆 Final scores</h1><div class="card big">${board(s)}</div><div id="pick"></div>`);
+  }
+}
+fetch('/api/room', { method: 'POST' }).then(r => r.json()).then(r => { room = r; new EventSource('/api/events?room=' + r.code).onmessage = e => render(JSON.parse(e.data)); });
+</script></body></html>

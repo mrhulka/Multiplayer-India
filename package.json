@@ -1,0 +1,1 @@
+{ "name": "desi-party-games", "private": true, "scripts": { "start": "node server.js", "test": "node test.js" } }

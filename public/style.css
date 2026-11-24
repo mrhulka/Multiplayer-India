@@ -1,0 +1,13 @@
+:root { --bg:#1b1340; --card:#2a1f5c; --saffron:#ff9933; --green:#2fb36b; --fg:#fff8ee; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--fg); text-align:center; }
+h1 { color:var(--saffron); margin:.4em 0; }
+button { font:inherit; font-size:1.2em; padding:.6em 1.2em; border:0; border-radius:12px; background:var(--saffron); color:#1b1340; font-weight:700; cursor:pointer; margin:.3em; }
+button:disabled { opacity:.4; }
+input { font:inherit; font-size:1.3em; padding:.5em; border-radius:10px; border:0; width:100%; max-width:320px; margin:.3em 0; text-align:center; }
+.card { background:var(--card); border-radius:16px; padding:1em; margin:1em auto; max-width:900px; }
+.pill { display:inline-block; background:var(--card); padding:.3em .8em; border-radius:99px; margin:.2em; }
+.pill.done { background:var(--green); }
+.map { height:60vh; border-radius:16px; margin:auto; max-width:1000px; }
+table { margin:auto; border-collapse:collapse; } td { padding:.3em .8em; }
+.big { font-size:2.4em; font-weight:800; }

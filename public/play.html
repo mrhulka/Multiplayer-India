@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Join Game</title><link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+</head><body><div id="app"></div><script>
+const $ = h => (document.getElementById('app').innerHTML = h);
+const esc = s => String(s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
+const post = (p, b) => fetch('/api/' + p, { method: 'POST', body: JSON.stringify(b) }).then(r => r.json());
+let code = new URLSearchParams(location.search).get('room') || '', me, secret, key, guess;
+
+$(`<h1>Join the game</h1><div class="card"><input id="c" placeholder="Room code" value="${esc(code)}" maxlength="4" style="text-transform:uppercase">
+  <input id="n" placeholder="Your name" maxlength="16"><br><button id="go">Join</button><p id="err"></p></div>`);
+document.getElementById('go').onclick = async () => {
+  code = document.getElementById('c').value.toUpperCase();
+  const r = await post('join', { room: code, name: document.getElementById('n').value });
+  if (r.error) return document.getElementById('err').textContent = r.error;
+  me = r.id; secret = r.secret; new EventSource('/api/events?room=' + code).onmessage = e => render(JSON.parse(e.data));
+};
+
+const submit = async () => { if (guess == null) return; const r = await post('answer', { room: code, id: me, secret, guess });
+  if (!r.error) $('<h1>✅ Locked in!</h1><p>Look at the big screen.</p>'); };
+
+function render(s) {
+  const k = s.phase + s.round; if (k === key) return; key = k; guess = null;
+  const mine = s.players.find(p => p.id === me) || {};
+  if (s.phase === 'lobby') $(`<h1>You're in, ${esc(mine.name)}!</h1><p>Waiting for the host to pick a game…</p>`);
+  else if (s.phase === 'question' && s.game === 'map') {
+    $(`<p><b>Where is ${esc(s.prompt)}?</b><br>Tap the map to drop your pin</p><div id="m" class="map" style="height:65vh"></div><button id="s" disabled>Lock it in</button>`);
+    const m = L.map('m', { zoomControl: false }).setView([22.5, 80], 4); let pin;
+    // no-labels tiles so the map doesn't give the answer away
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(m);
+    m.on('click', e => { guess = e.latlng; pin ? pin.setLatLng(e.latlng) : (pin = L.marker(e.latlng).addTo(m)); document.getElementById('s').disabled = false; });
+    document.getElementById('s').onclick = submit;
+  } else if (s.phase === 'question') {
+    $(`<p><b>${esc(s.prompt)}</b></p><input id="g" type="number" inputmode="decimal" placeholder="Your guess ${s.unit ? '(' + esc(s.unit) + ')' : ''}"><br><button id="s">Lock it in</button>`);
+    document.getElementById('s').onclick = () => { const v = document.getElementById('g').value; guess = v === '' ? null : +v; submit(); };
+  } else if (s.phase === 'reveal') {
+    const r = s.reveal.results.find(x => x.id === me);
+    $(`<h1>${r ? '+' + r.points : 'Too slow! 🐢'}</h1><p>Total: ${mine.score}</p>`);
+  } else {
+    const rank = [...s.players].sort((a, b) => b.score - a.score).findIndex(p => p.id === me) + 1;
+    $(`<h1>${rank === 1 ? '🏆 Winner!' : '#' + rank}</h1><p>${mine.score} points</p><p>Waiting for the next game…</p>`);
+  }
+}
+</script></body></html>
