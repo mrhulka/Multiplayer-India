@@ -1,0 +1,9 @@
+{
+  "name": "desi-party-games",
+  "main": "worker/index.js",
+  "compatibility_date": "2025-09-01",
+  "account_id": "a41578216d6ae44d98f5959b066bc713",
+  "assets": { "directory": "./public", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
+  "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "Hub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Hub"] }]
+}

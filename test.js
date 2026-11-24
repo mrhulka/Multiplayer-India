@@ -1,6 +1,5 @@
 const assert = require('assert'), fs = require('fs'), os = require('os');
-process.env.SEEN_FILE = os.tmpdir() + '/seen-test-' + process.pid + '.json';
-const { km, rankPoints, circlePoints, deal, markSeen, ROUNDS } = require('./server'), Q = require('./questions');
+const { km, rankPoints, circlePoints, deal, markSeen, ROUNDS } = require('./game'), Q = require('./questions'); // seen history stays in memory here
 
 // scoring
 assert(Math.abs(km({ lat: 28.6139, lng: 77.209 }, { lat: 19.076, lng: 72.8777 }) - 1150) < 20); // Delhi–Mumbai ≈ 1150 km
@@ -23,5 +22,4 @@ for (const [game, key] of [['map', q => q.name], ['num', q => q[0]]]) {
   for (let g = 0; g < games; g++) for (const q of deal(game)) { assert(!asked.has(key(q)), 'repeat: ' + key(q)); asked.add(key(q)); markSeen(game, q); }
   assert.strictEqual(deal(game).length, ROUNDS); // exhausted → fresh cycle
 }
-setTimeout(() => fs.rmSync(process.env.SEEN_FILE, { force: true }), 100);
 console.log(`ok · ${Q.map.length} places (${Math.floor(Q.map.length / ROUNDS)} games) · ${Q.num.length} Andaaza (${Math.floor(Q.num.length / ROUNDS)} games) with no repeats`);

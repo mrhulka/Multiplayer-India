@@ -1,1 +1,13 @@
-{ "name": "desi-party-games", "private": true, "scripts": { "start": "node server.js", "test": "node test.js" } }
+{
+  "name": "desi-party-games",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js",
+    "deploy": "wrangler deploy",
+    "dev:cf": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.167.0"
+  }
+}

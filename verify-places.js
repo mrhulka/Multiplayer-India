@@ -1,6 +1,6 @@
 // Checks every Too Much Work place against Wikipedia: official coordinates + lead photo.
 // Usage: NODE_USE_ENV_PROXY=1 node verify-places.js > places-check.json   (needs en.wikipedia.org)
-const Q = require('./questions'), { km } = require('./server');
+const Q = require('./questions'), { km } = require('./game');
 const API = 'https://en.wikipedia.org/w/api.php?format=json&formatversion=2&redirects=1&prop=coordinates|pageimages&piprop=thumbnail&pithumbsize=1280&colimit=max&pilimit=max&action=query&';
 const UA = { 'user-agent': 'desi-party-games/1.0 (question verifier)' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));

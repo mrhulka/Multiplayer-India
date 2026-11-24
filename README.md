@@ -22,3 +22,12 @@ Refreshing the page puts you back into your game.
 
 Each game has 8 rounds of 15 s. The host can go **Back to lobby** at any time and start the other game with the same players.
 **Question bank:** `questions.js` has 310 places (enough for 38 games) and 431 Andaaza questions (enough for 53 games). Questions never repeat until the whole bank has been used. The server records every question it asks in `seen.json`, and that record survives restarts. Delete `seen.json` to start over. No dependencies. `npm test` checks the scoring.
+
+## Cloudflare
+
+The same game runs on Cloudflare Workers (`worker/index.js` + `wrangler.jsonc`). Static files are served from `public/`, and every room lives in one Durable Object. Rooms are kept in memory, so a game in progress is lost if Cloudflare restarts the Durable Object, which happens when nobody has been connected for a while. The no-repeat history is saved in Durable Object storage.
+
+```bash
+npm install
+npm run deploy
+```

@@ -1,1 +1,3 @@
 seen.json
+node_modules/
+.wrangler/
