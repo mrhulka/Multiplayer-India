@@ -1,6 +1,6 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
 const Q = require('./questions');
-const ROUNDS = 5, ASK_MS = 25000, REVEAL_MS = 8000, POINTS = [1000, 750, 500];
+const ROUNDS = 8, ASK_MS = 15000, REVEAL_MS = 10000, EXACT_BONUS = 200, MIN_R = 25, MAX_R = 1000;
 const rooms = {}; // ponytail: in-memory rooms, lost on restart; add a store if games must survive deploys
 
 const km = (a, b) => { // haversine
@@ -8,14 +8,16 @@ const km = (a, b) => { // haversine
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.sqrt(h));
 };
-// rank by error: 1st 1000, 2nd 750, 3rd 500, rest 250; ties share a rank
-function score(errs) {
-  const sorted = [...new Set(Object.values(errs))].sort((a, b) => a - b);
-  return Object.fromEntries(Object.entries(errs).map(([id, e]) => [id, POINTS[sorted.indexOf(e)] ?? 250]));
+// closest 1000, farthest 100, linear in between by rank; ties share
+function rankPoints(errs) {
+  const d = [...new Set(Object.values(errs))].sort((a, b) => a - b);
+  return Object.fromEntries(Object.entries(errs).map(([id, e]) => [id, d.length < 2 ? 1000 : Math.round(1000 - 900 * d.indexOf(e) / (d.length - 1))]));
 }
+// circle mode: answer inside your circle scores 1000 - radius(km), min 100; outside scores 0
+const circlePoints = (dist, radius) => dist <= radius ? Math.max(100, Math.round(1000 - radius)) : 0;
 
-const pub = r => ({ code: r.code, phase: r.phase, game: r.game, round: r.round, total: ROUNDS, endsAt: r.endsAt,
-  prompt: r.q?.[0], unit: r.game === 'num' ? r.q?.[2] : undefined,
+const pub = r => ({ code: r.code, phase: r.phase, game: r.game, mode: r.mode, round: r.round, total: ROUNDS, endsAt: r.endsAt,
+  prompt: r.q && (r.game === 'map' ? r.q.name : r.q[0]), wiki: r.q?.wiki, unit: r.game === 'num' ? r.q?.[2] : undefined,
   players: Object.entries(r.players).map(([id, p]) => ({ id, name: p.name, score: p.score, answered: id in r.answers })),
   reveal: r.reveal });
 const send = r => { const d = `data: ${JSON.stringify(pub(r))}\n\n`; r.clients.forEach(c => c.write(d)); };
@@ -23,30 +25,38 @@ const send = r => { const d = `data: ${JSON.stringify(pub(r))}\n\n`; r.clients.f
 function ask(r) {
   if (r.round >= ROUNDS) { r.phase = 'final'; r.q = null; return send(r); }
   r.q = r.deck[r.round++]; r.answers = {}; r.reveal = null; r.phase = 'question'; r.endsAt = Date.now() + ASK_MS;
+  r.mode = r.game === 'map' && r.round % 2 === 0 ? 'circle' : 'pin'; // alternate pin / circle rounds
   clearTimeout(r.timer); r.timer = setTimeout(() => reveal(r), ASK_MS); send(r);
 }
 function reveal(r) {
   clearTimeout(r.timer);
-  const ans = r.game === 'map' ? { lat: r.q[1], lng: r.q[2] } : r.q[1];
-  const errs = Object.fromEntries(Object.entries(r.answers).map(([id, g]) => [id, r.game === 'map' ? Math.round(km(g, ans)) : Math.abs(g - ans)]));
-  const pts = score(errs);
+  const map = r.game === 'map', ans = map ? { lat: r.q.lat, lng: r.q.lng } : r.q[1];
+  const errs = Object.fromEntries(Object.entries(r.answers).map(([id, g]) => [id, map ? Math.round(km(g, ans)) : Math.abs(g - ans)]));
+  const pts = r.mode === 'circle'
+    ? Object.fromEntries(Object.entries(errs).map(([id, e]) => [id, circlePoints(e, r.answers[id].radius)]))
+    : rankPoints(errs);
+  if (!map) for (const id in errs) if (errs[id] === 0) pts[id] += EXACT_BONUS;
   for (const id in pts) r.players[id].score += pts[id];
-  r.reveal = { answer: ans, unit: r.q[2], results: Object.keys(pts).map(id => ({ id, name: r.players[id].name, guess: r.answers[id], err: errs[id], points: pts[id] })).sort((a, b) => b.points - a.points) };
+  r.reveal = { answer: ans, unit: map ? 'km' : r.q[2], fact: r.q.fact, name: map ? r.q.name : undefined,
+    results: Object.keys(pts).map(id => ({ id, name: r.players[id].name, guess: r.answers[id], err: errs[id], points: pts[id], exact: !map && errs[id] === 0 })).sort((a, b) => b.points - a.points) };
   r.phase = 'reveal'; send(r); r.timer = setTimeout(() => ask(r), REVEAL_MS);
 }
 
+const host = (r, b) => { if (b.token !== r.token) throw 'not host'; };
 const api = {
   room() { let code; do code = Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[crypto.randomInt(24)]).join(''); while (rooms[code]);
     rooms[code] = { code, token: crypto.randomUUID(), phase: 'lobby', players: {}, answers: {}, clients: new Set(), round: 0 };
     return { code, token: rooms[code].token }; },
   join(r, b) { const name = String(b.name || '').trim().slice(0, 16); if (!name) throw 'name required';
     const id = crypto.randomUUID(), secret = crypto.randomUUID(); r.players[id] = { name, score: 0, secret }; send(r); return { id, secret }; },
-  start(r, b) { if (b.token !== r.token) throw 'not host'; if (!Q[b.game]) throw 'bad game';
+  start(r, b) { host(r, b); if (!Q[b.game]) throw 'bad game';
     r.game = b.game; r.round = 0; r.deck = [...Q[b.game]].sort(() => Math.random() - .5);
     for (const p of Object.values(r.players)) p.score = 0; ask(r); return {}; },
+  lobby(r, b) { host(r, b); clearTimeout(r.timer); Object.assign(r, { phase: 'lobby', q: null, reveal: null, answers: {}, round: 0 }); send(r); return {}; },
   answer(r, b) { if (r.phase !== 'question' || r.players[b.id]?.secret !== b.secret) throw 'not now';
     const g = r.game === 'map' ? { lat: +b.guess?.lat, lng: +b.guess?.lng } : +b.guess;
-    if (!(r.game === 'map' ? [g.lat, g.lng] : [g]).every(Number.isFinite)) throw 'bad guess';
+    if (r.mode === 'circle') g.radius = Math.min(MAX_R, Math.max(MIN_R, +b.guess?.radius));
+    if (!(r.game === 'map' ? Object.values(g) : [g]).every(Number.isFinite)) throw 'bad guess';
     r.answers[b.id] = g; if (Object.keys(r.answers).length === Object.keys(r.players).length) reveal(r); else send(r); return {}; },
 };
 
@@ -75,4 +85,4 @@ if (require.main === module) {
     console.log(`Open the HOST screen at one of:\n${ips.map(ip => `  http://${ip}:${port}`).join('\n') || `  http://localhost:${port}`}\n(use the LAN address so phones can reach the QR link)`);
   });
 }
-module.exports = { km, score };
+module.exports = { km, rankPoints, circlePoints };

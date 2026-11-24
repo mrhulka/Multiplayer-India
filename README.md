@@ -8,7 +8,12 @@ npm start
 
 Open the printed **LAN address** on the TV or laptop. Don't use `localhost`, or the QR link won't work on phones. Phones must be on the same Wi‑Fi.
 
-- **Map Grab: Bharat Edition**: drop a pin on a label-free map of India where you think the landmark is. Closest pin wins.
-- **Ball Park: Desi Estimates**: guess a number (cricket, history, geography, Bollywood). Closest guess wins.
+- **Too Much Work**: the TV shows a photo or a place name. Players drop a pin on a label-free map of India on their phone. Rounds alternate between:
+  - 📍 **Pin**: closest gets 1000, farthest gets 100, and everyone else is spaced evenly by rank.
+  - ⭕ **Circle**: pin plus a 25–1000 km circle. If the place is inside your circle you get 1000 − radius (minimum 100). If it's outside you get 0.
 
-Each game has 5 rounds of 25 s. Points go by rank: 1000 / 750 / 500, and 250 for everyone else who answered. Add questions in `questions.js`. No dependencies.
+  After each round the TV shows every pin, the real spot and a fact about the place.
+- **Andaaza**: guess the number (cricket, history, ISRO, Bollywood…). The reveal shows every guess on a number line. Closest gets 1000, farthest gets 100, and an exact guess gets +200 on top.
+
+Each game has 8 rounds of 15 s. The host can go **Back to lobby** at any time and start the other game with the same players.
+Questions, places, Wikipedia photo pages and facts are in `questions.js`. No dependencies. `npm test` checks the scoring.

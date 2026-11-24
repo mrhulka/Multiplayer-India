@@ -6,14 +6,16 @@
 </head><body><div id="app"></div><script>
 const $ = h => (document.getElementById('app').innerHTML = h);
 const esc = s => String(s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
-const NAMES = { map: 'Map Grab: Bharat Edition', num: 'Ball Park: Desi Estimates' };
+const NAMES = { map: '🗺️ Too Much Work', num: '🔢 Andaaza' };
 let room, key, tick;
-const board = s => '<table>' + [...s.players].sort((a, b) => b.score - a.score).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td><b>${p.score}</b></td></tr>`).join('') + '</table>';
-const start = game => fetch('/api/start', { method: 'POST', body: JSON.stringify({ room: room.code, token: room.token, game }) });
-const picker = s => `<button onclick="start('map')" ${s.players.length ? '' : 'disabled'}>🗺️ ${NAMES.map}</button><button onclick="start('num')" ${s.players.length ? '' : 'disabled'}>🏏 ${NAMES.num}</button>`;
+const call = (p, b = {}) => fetch('/api/' + p, { method: 'POST', body: JSON.stringify({ room: room.code, token: room.token, ...b }) });
+const board = s => '<table>' + [...s.players].sort((a, b) => b.score - a.score).map((p, i) => `<tr><td>${i ? i + 1 : '🏆'}</td><td>${esc(p.name)}</td><td><b>${p.score}</b></td></tr>`).join('') + '</table>';
+const picker = s => Object.entries(NAMES).map(([g, n]) => `<button onclick="call('start',{game:'${g}'})" ${s.players.length ? '' : 'disabled'}>${n}</button>`).join('');
+const lobbyBtn = '<button class="ghost" onclick="call(\'lobby\')">⟵ Back to lobby</button>';
+const photo = wiki => fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + wiki).then(r => r.json()).then(j => j.originalimage?.source || j.thumbnail?.source);
 
 function render(s) {
-  const k = s.phase + s.round;
+  const k = s.phase + s.round + s.game;
   if (k !== key) { key = k; clearInterval(tick); draw(s); }
   const pick = document.getElementById('pick'); if (pick) pick.innerHTML = picker(s);
   const pills = document.getElementById('pills');
@@ -21,30 +23,44 @@ function render(s) {
 }
 function draw(s) {
   if (s.phase === 'lobby') {
-    const url = `${location.origin}/play?room=${s.code}`;
     $(`<h1>Desi Party Games</h1><div class="card"><div id="qr" style="display:inline-block;background:#fff;padding:12px;border-radius:12px"></div>
       <p>Scan to join, or open <b>${esc(location.host)}/play</b> and enter</p><div class="big">${s.code}</div></div>
       <div class="card" id="pills"></div><div id="pick"></div>`);
-    new QRCode(document.getElementById('qr'), { text: url, width: 220, height: 220 });
+    new QRCode(document.getElementById('qr'), { text: `${location.origin}/play?room=${s.code}`, width: 220, height: 220 });
   } else if (s.phase === 'question') {
-    $(`<p>${NAMES[s.game]} · Round ${s.round}/${s.total}</p><div class="card big">${s.game === 'map' ? '📍 Where is ' : ''}${esc(s.prompt)}${s.game === 'map' ? '?' : (s.unit ? ` <small>(${esc(s.unit)})</small>` : '')}</div>
+    const how = s.game === 'num' ? 'Type your andaaza' : s.mode === 'circle' ? '⭕ Pin it and draw a circle. Smaller circle = more points, but miss and you get 0' : '📍 Drop your pin';
+    $(`${lobbyBtn}<p>${NAMES[s.game]} · Round ${s.round}/${s.total} · ${how}</p>
+      <div class="card big" id="ask">${s.game === 'map' ? 'Where is ' + esc(s.prompt) + '?' : esc(s.prompt) + (s.unit ? ` <small>(${esc(s.unit)})</small>` : '')}</div>
       <div class="big" id="t"></div><div class="card" id="pills"></div>`);
-    tick = setInterval(() => document.getElementById('t').textContent = Math.max(0, Math.ceil((s.endsAt - Date.now()) / 1000)), 250);
+    if (s.wiki) { document.getElementById('ask').textContent = 'Loading photo…';
+      photo(s.wiki).then(src => { if (!src) throw 0; document.getElementById('ask').innerHTML = `<div>Where is this?</div><img class="photo" src="${esc(src)}">`; })
+        .catch(() => document.getElementById('ask').textContent = `Where is ${s.prompt}?`); }
+    const t = () => document.getElementById('t').textContent = '⏱ ' + Math.max(0, Math.ceil((s.endsAt - Date.now()) / 1000)); t(); tick = setInterval(t, 250);
   } else if (s.phase === 'reveal') {
-    const r = s.reveal, rows = r.results.map(x => `<tr><td>${esc(x.name)}</td><td>${s.game === 'map' ? x.err + ' km off' : x.guess + ' (off by ' + x.err + ')'}</td><td>+${x.points}</td></tr>`).join('');
-    $(`<div class="card big">${s.game === 'map' ? esc(s.prompt) : 'Answer: ' + r.answer + ' ' + esc(r.unit || '')}</div>
-      ${s.game === 'map' ? '<div id="m" class="map"></div>' : ''}<div class="card"><table>${rows || '<tr><td>Nobody answered!</td></tr>'}</table></div>`);
-    if (s.game === 'map') {
+    const r = s.reveal, map = s.game === 'map';
+    const rows = r.results.map(x => `<tr><td>${esc(x.name)}</td><td>${map ? x.err + ' km off' + (x.guess.radius ? ` · ⭕ ${Math.round(x.guess.radius)} km` : '') : x.guess + ' (off by ' + x.err + ')'}${x.exact ? ' 🎯 +200 exact!' : ''}</td><td><b>+${x.points}</b></td></tr>`).join('');
+    $(`${lobbyBtn}<div class="card big">${map ? esc(r.name) : 'Answer: ' + r.answer + ' ' + esc(r.unit || '')}</div>
+      ${map ? '<div id="m" class="map" style="height:50vh"></div>' : scale(r)}
+      ${r.fact ? `<div class="card fact"><b>Did you know?</b> ${esc(r.fact)}</div>` : ''}
+      <div class="card"><table>${rows || '<tr><td>Nobody answered!</td></tr>'}</table></div>`);
+    if (map) {
       const m = L.map('m'), pts = [[r.answer.lat, r.answer.lng]];
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(m);
-      L.circleMarker(pts[0], { radius: 12, color: '#2fb36b', fillOpacity: 1 }).addTo(m).bindTooltip('🎯 ' + s.prompt, { permanent: true });
+      L.circleMarker(pts[0], { radius: 12, color: '#2fb36b', fillOpacity: 1 }).addTo(m).bindTooltip('🎯 ' + esc(r.name), { permanent: true });
       r.results.forEach(x => { const p = [x.guess.lat, x.guess.lng]; pts.push(p);
-        L.marker(p).addTo(m).bindTooltip(x.name, { permanent: true }); L.polyline([pts[0], p], { color: '#ff9933', dashArray: '6' }).addTo(m); });
+        L.marker(p).addTo(m).bindTooltip(esc(x.name), { permanent: true }); L.polyline([pts[0], p], { color: '#ff9933', dashArray: '6' }).addTo(m);
+        if (x.guess.radius) L.circle(p, { radius: x.guess.radius * 1000, color: x.points ? '#2fb36b' : '#e5484d' }).addTo(m); });
       m.fitBounds(pts, { padding: [40, 40], maxZoom: 7 });
     }
   } else {
-    $(`<h1>🏆 Final scores</h1><div class="card big">${board(s)}</div><div id="pick"></div>`);
+    $(`${lobbyBtn}<h1>🏆 ${esc([...s.players].sort((a, b) => b.score - a.score)[0]?.name || '')} wins!</h1><div class="card big">${board(s)}</div><p>Play again:</p><div id="pick"></div>`);
   }
+}
+// number line: answer as a green line, guesses alternating above/below
+function scale(r) {
+  const vals = [r.answer, ...r.results.map(x => x.guess)], lo = Math.min(...vals), hi = Math.max(...vals), pos = v => 5 + 90 * (v - lo) / (hi - lo || 1);
+  return `<div class="scale"><div class="tick ans" style="left:${pos(r.answer)}%">${r.answer}</div>` +
+    r.results.map((x, i) => `<div class="tick ${i % 2 ? 'up' : 'down'}" style="left:${pos(x.guess)}%">${esc(x.name)}<br><b>${x.guess}</b></div>`).join('') + '</div>';
 }
 fetch('/api/room', { method: 'POST' }).then(r => r.json()).then(r => { room = r; new EventSource('/api/events?room=' + r.code).onmessage = e => render(JSON.parse(e.data)); });
 </script></body></html>

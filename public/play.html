@@ -21,25 +21,33 @@ const submit = async () => { if (guess == null) return; const r = await post('an
   if (!r.error) $('<h1>✅ Locked in!</h1><p>Look at the big screen.</p>'); };
 
 function render(s) {
-  const k = s.phase + s.round; if (k === key) return; key = k; guess = null;
+  const k = s.phase + s.round + s.game; if (k === key) return; key = k; guess = null;
   const mine = s.players.find(p => p.id === me) || {};
   if (s.phase === 'lobby') $(`<h1>You're in, ${esc(mine.name)}!</h1><p>Waiting for the host to pick a game…</p>`);
   else if (s.phase === 'question' && s.game === 'map') {
-    $(`<p><b>Where is ${esc(s.prompt)}?</b><br>Tap the map to drop your pin</p><div id="m" class="map" style="height:65vh"></div><button id="s" disabled>Lock it in</button>`);
-    const m = L.map('m', { zoomControl: false }).setView([22.5, 80], 4); let pin;
+    const circle = s.mode === 'circle';
+    $(`<p><b>${s.wiki ? 'Where is the place on the big screen? 👀' : 'Where is ' + esc(s.prompt) + '?'}</b><br>${circle ? 'Tap to pin, then size your circle. Smaller circle = more points, but miss and you get 0' : 'Tap the map to drop your pin'}</p>
+      <div id="m" class="map" style="height:${circle ? 55 : 65}vh"></div>
+      ${circle ? '<input id="r" type="range" min="25" max="1000" step="25" value="300"><div id="rl"></div>' : ''}<button id="s" disabled>Lock it in</button>`);
+    const m = L.map('m', { zoomControl: false }).setView([22.5, 80], 4); let pin, ring;
     // no-labels tiles so the map doesn't give the answer away
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(m);
-    m.on('click', e => { guess = e.latlng; pin ? pin.setLatLng(e.latlng) : (pin = L.marker(e.latlng).addTo(m)); document.getElementById('s').disabled = false; });
+    const rad = () => circle ? +document.getElementById('r').value : undefined;
+    const upd = () => { if (!pin) return; guess = { ...pin.getLatLng(), radius: rad() };
+      if (circle) { ring ? ring.setLatLng(guess).setRadius(guess.radius * 1000) : (ring = L.circle(guess, { radius: guess.radius * 1000, color: '#ff9933' }).addTo(m));
+        document.getElementById('rl').textContent = `⭕ ${guess.radius} km · up to ${Math.max(100, 1000 - guess.radius)} pts`; } };
+    m.on('click', e => { pin ? pin.setLatLng(e.latlng) : (pin = L.marker(e.latlng).addTo(m)); document.getElementById('s').disabled = false; upd(); });
+    if (circle) document.getElementById('r').oninput = upd;
     document.getElementById('s').onclick = submit;
   } else if (s.phase === 'question') {
-    $(`<p><b>${esc(s.prompt)}</b></p><input id="g" type="number" inputmode="decimal" placeholder="Your guess ${s.unit ? '(' + esc(s.unit) + ')' : ''}"><br><button id="s">Lock it in</button>`);
+    $(`<p><b>${esc(s.prompt)}</b></p><input id="g" type="number" inputmode="decimal" placeholder="Your andaaza ${s.unit ? '(' + esc(s.unit) + ')' : ''}"><br><button id="s">Lock it in</button>`);
     document.getElementById('s').onclick = () => { const v = document.getElementById('g').value; guess = v === '' ? null : +v; submit(); };
   } else if (s.phase === 'reveal') {
     const r = s.reveal.results.find(x => x.id === me);
-    $(`<h1>${r ? '+' + r.points : 'Too slow! 🐢'}</h1><p>Total: ${mine.score}</p>`);
+    $(`<h1>${r ? '+' + r.points + (r.exact ? ' 🎯' : '') : 'Too slow! 🐢'}</h1><p>Total: ${mine.score}</p>${s.reveal.fact ? `<div class="card">${esc(s.reveal.fact)}</div>` : ''}`);
   } else {
     const rank = [...s.players].sort((a, b) => b.score - a.score).findIndex(p => p.id === me) + 1;
-    $(`<h1>${rank === 1 ? '🏆 Winner!' : '#' + rank}</h1><p>${mine.score} points</p><p>Waiting for the next game…</p>`);
+    $(`<h1>${rank === 1 ? '🏆 Winner!' : '#' + rank}</h1><p>${mine.score} points</p><p>Waiting for the host…</p>`);
   }
 }
 </script></body></html>
