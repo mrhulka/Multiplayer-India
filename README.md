@@ -25,7 +25,7 @@ Each game has 8 rounds of 15 s. The host can go **Back to lobby** at any time an
 
 ## Cloudflare
 
-The same game runs on Cloudflare Workers (`worker/index.js` + `wrangler.jsonc`). Static files are served from `public/`, and every room lives in one Durable Object. Rooms are kept in memory, so a game in progress is lost if Cloudflare restarts the Durable Object, which happens when nobody has been connected for a while. The no-repeat history is saved in Durable Object storage.
+Live at **https://desi-party-games.sajeshsoman6.workers.dev**. The same game runs on Cloudflare Workers (`worker/index.js` + `wrangler.jsonc`). The two page files are bundled into the Worker, and every room lives in one Durable Object. Rooms are kept in memory, so a game in progress is lost if Cloudflare restarts the Durable Object, which happens when nobody has been connected for a while. The no-repeat history is saved in Durable Object storage.
 
 ```bash
 npm install
