@@ -26,7 +26,7 @@ function render(s) {
   if (s.phase === 'lobby') $(`<h1>You're in, ${esc(mine.name)}!</h1><p>Waiting for the host to pick a game…</p>`);
   else if (s.phase === 'question' && s.game === 'map') {
     const circle = s.mode === 'circle';
-    $(`<p><b>${s.wiki ? 'Where is the place on the big screen? 👀' : 'Where is ' + esc(s.prompt) + '?'}</b><br>${circle ? 'Tap to pin, then size your circle. Smaller circle = more points, but miss and you get 0' : 'Tap the map to drop your pin'}</p>
+    $(`<p><b>${s.photoOnly ? 'Where is the place on the big screen? 👀' : 'Where is ' + esc(s.prompt) + '?'}</b><br>${circle ? 'Tap to pin, then size your circle. Smaller circle = more points, but miss and you get 0' : 'Tap the map to drop your pin'}</p>
       <div id="m" class="map" style="height:${circle ? 55 : 65}vh"></div>
       ${circle ? '<input id="r" type="range" min="25" max="1000" step="25" value="300"><div id="rl"></div>' : ''}<button id="s" disabled>Lock it in</button>`);
     const m = L.map('m', { zoomControl: false }).setView([22.5, 80], 4); let pin, ring;

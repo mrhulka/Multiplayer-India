@@ -12,7 +12,6 @@ const call = (p, b = {}) => fetch('/api/' + p, { method: 'POST', body: JSON.stri
 const board = s => '<table>' + [...s.players].sort((a, b) => b.score - a.score).map((p, i) => `<tr><td>${i ? i + 1 : '🏆'}</td><td>${esc(p.name)}</td><td><b>${p.score}</b></td></tr>`).join('') + '</table>';
 const picker = s => Object.entries(NAMES).map(([g, n]) => `<button onclick="call('start',{game:'${g}'})" ${s.players.length ? '' : 'disabled'}>${n}</button>`).join('');
 const lobbyBtn = '<button class="ghost" onclick="call(\'lobby\')">⟵ Back to lobby</button>';
-const photo = wiki => fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + wiki).then(r => r.json()).then(j => j.originalimage?.source || j.thumbnail?.source);
 
 function render(s) {
   const k = s.phase + s.round + s.game;
@@ -32,16 +31,17 @@ function draw(s) {
     $(`${lobbyBtn}<p>${NAMES[s.game]} · Round ${s.round}/${s.total} · ${how}</p>
       <div class="card big" id="ask">${s.game === 'map' ? 'Where is ' + esc(s.prompt) + '?' : esc(s.prompt) + (s.unit ? ` <small>(${esc(s.unit)})</small>` : '')}</div>
       <div class="big" id="t"></div><div class="card" id="pills"></div>`);
-    if (s.wiki) { document.getElementById('ask').textContent = 'Loading photo…';
-      photo(s.wiki).then(src => { if (!src) throw 0; document.getElementById('ask').innerHTML = `<div>Where is this?</div><img class="photo" src="${esc(src)}">`; })
-        .catch(() => document.getElementById('ask').textContent = `Where is ${s.prompt}?`); }
+    // photo rounds show only the picture (falls back to the name if it fails to load); name rounds show both
+    if (s.img) { const ask = document.getElementById('ask'), img = new Image();
+      img.className = 'photo'; img.src = s.img; img.onerror = () => { img.remove(); if (s.photoOnly) ask.firstChild.textContent = `Where is ${s.prompt}?`; };
+      ask.replaceChildren(Object.assign(document.createElement('div'), { textContent: s.photoOnly ? 'Where is this?' : `Where is ${s.prompt}?` }), img); }
     const t = () => document.getElementById('t').textContent = '⏱ ' + Math.max(0, Math.ceil((s.endsAt - Date.now()) / 1000)); t(); tick = setInterval(t, 250);
   } else if (s.phase === 'reveal') {
     const r = s.reveal, map = s.game === 'map';
     const rows = r.results.map(x => `<tr><td>${esc(x.name)}</td><td>${map ? x.err + ' km off' + (x.guess.radius ? ` · ⭕ ${Math.round(x.guess.radius)} km` : '') : x.guess + ' (off by ' + x.err + ')'}${x.exact ? ' 🎯 +200 exact!' : ''}</td><td><b>+${x.points}</b></td></tr>`).join('');
     $(`${lobbyBtn}<div class="card big">${map ? esc(r.name) : 'Answer: ' + r.answer + ' ' + esc(r.unit || '')}</div>
       ${map ? '<div id="m" class="map" style="height:50vh"></div>' : scale(r)}
-      ${r.fact ? `<div class="card fact"><b>Did you know?</b> ${esc(r.fact)}</div>` : ''}
+      ${r.fact ? `<div class="card fact">${r.img ? `<img src="${esc(r.img)}" style="height:90px;border-radius:8px;vertical-align:middle;margin-right:12px" onerror="this.remove()">` : ''}<b>Did you know?</b> ${esc(r.fact)}</div>` : ''}
       <div class="card"><table>${rows || '<tr><td>Nobody answered!</td></tr>'}</table></div>`);
     if (map) {
       const m = L.map('m'), pts = [[r.answer.lat, r.answer.lng]];

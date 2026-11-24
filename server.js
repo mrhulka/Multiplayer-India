@@ -30,7 +30,7 @@ function rankPoints(errs) {
 const circlePoints = (dist, radius) => dist <= radius ? Math.max(100, Math.round(1000 - radius)) : 0;
 
 const pub = r => ({ code: r.code, phase: r.phase, game: r.game, mode: r.mode, round: r.round, total: ROUNDS, endsAt: r.endsAt,
-  prompt: r.q && (r.game === 'map' ? r.q.name : r.q[0]), wiki: r.q?.wiki, unit: r.game === 'num' ? r.q?.[2] : undefined,
+  prompt: r.q && (r.game === 'map' ? r.q.name : r.q[0]), img: r.q?.img, photoOnly: !!(r.q?.wiki && r.q?.img), unit: r.game === 'num' ? r.q?.[2] : undefined,
   players: Object.entries(r.players).map(([id, p]) => ({ id, name: p.name, score: p.score, answered: id in r.answers })),
   reveal: r.reveal });
 const send = r => { const d = `data: ${JSON.stringify(pub(r))}\n\n`; r.clients.forEach(c => c.write(d)); };
@@ -50,7 +50,7 @@ function reveal(r) {
     : rankPoints(errs);
   if (!map) for (const id in errs) if (errs[id] === 0) pts[id] += EXACT_BONUS;
   for (const id in pts) r.players[id].score += pts[id];
-  r.reveal = { answer: ans, unit: map ? 'km' : r.q[2], fact: r.q.fact, name: map ? r.q.name : undefined,
+  r.reveal = { answer: ans, unit: map ? 'km' : r.q[2], fact: r.q.fact, img: r.q.img, name: map ? r.q.name : undefined,
     results: Object.keys(pts).map(id => ({ id, name: r.players[id].name, guess: r.answers[id], err: errs[id], points: pts[id], exact: !map && errs[id] === 0 })).sort((a, b) => b.points - a.points) };
   r.phase = 'reveal'; send(r); r.timer = setTimeout(() => ask(r), REVEAL_MS);
 }
