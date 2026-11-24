@@ -1,7 +1,20 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
 const Q = require('./questions');
 const ROUNDS = 8, ASK_MS = 15000, REVEAL_MS = 10000, EXACT_BONUS = 200, MIN_R = 25, MAX_R = 1000;
-const rooms = {}; // ponytail: in-memory rooms, lost on restart; add a store if games must survive deploys
+const rooms = {};
+// No-repeat: remember every question asked (across rooms and restarts) and only deal unseen ones until the bank runs out.
+// ponytail: one history per server, which suits a household TV; key it per room or group if several groups share a server
+const SEEN = process.env.SEEN_FILE || path.join(__dirname, 'seen.json');
+let seen = {}; try { seen = JSON.parse(fs.readFileSync(SEEN)); } catch {}
+const keyOf = (game, q) => game === 'map' ? q.name : q[0];
+function deal(game) {
+  const used = new Set(seen[game] ||= []);
+  let fresh = Q[game].filter(q => !used.has(keyOf(game, q)));
+  if (fresh.length < ROUNDS) { seen[game] = []; fresh = [...Q[game]]; } // bank exhausted: start a new cycle
+  for (let i = fresh.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [fresh[i], fresh[j]] = [fresh[j], fresh[i]]; }
+  return fresh.slice(0, ROUNDS);
+}
+const markSeen = (game, q) => { seen[game].push(keyOf(game, q)); fs.writeFile(SEEN, JSON.stringify(seen), () => {}); }; // ponytail: in-memory rooms, lost on restart; add a store if games must survive deploys
 
 const km = (a, b) => { // haversine
   const r = x => x * Math.PI / 180, dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
@@ -24,7 +37,7 @@ const send = r => { const d = `data: ${JSON.stringify(pub(r))}\n\n`; r.clients.f
 
 function ask(r) {
   if (r.round >= ROUNDS) { r.phase = 'final'; r.q = null; return send(r); }
-  r.q = r.deck[r.round++]; r.answers = {}; r.reveal = null; r.phase = 'question'; r.endsAt = Date.now() + ASK_MS;
+  r.q = r.deck[r.round++]; markSeen(r.game, r.q); r.answers = {}; r.reveal = null; r.phase = 'question'; r.endsAt = Date.now() + ASK_MS;
   r.mode = r.game === 'map' && r.round % 2 === 0 ? 'circle' : 'pin'; // alternate pin / circle rounds
   clearTimeout(r.timer); r.timer = setTimeout(() => reveal(r), ASK_MS); send(r);
 }
@@ -50,7 +63,7 @@ const api = {
   join(r, b) { const name = String(b.name || '').trim().slice(0, 16); if (!name) throw 'name required';
     const id = crypto.randomUUID(), secret = crypto.randomUUID(); r.players[id] = { name, score: 0, secret }; send(r); return { id, secret }; },
   start(r, b) { host(r, b); if (!Q[b.game]) throw 'bad game';
-    r.game = b.game; r.round = 0; r.deck = [...Q[b.game]].sort(() => Math.random() - .5);
+    r.game = b.game; r.round = 0; r.deck = deal(b.game);
     for (const p of Object.values(r.players)) p.score = 0; ask(r); return {}; },
   lobby(r, b) { host(r, b); clearTimeout(r.timer); Object.assign(r, { phase: 'lobby', q: null, reveal: null, answers: {}, round: 0 }); send(r); return {}; },
   answer(r, b) { if (r.phase !== 'question' || r.players[b.id]?.secret !== b.secret) throw 'not now';
@@ -85,4 +98,4 @@ if (require.main === module) {
     console.log(`Open the HOST screen at one of:\n${ips.map(ip => `  http://${ip}:${port}`).join('\n') || `  http://localhost:${port}`}\n(use the LAN address so phones can reach the QR link)`);
   });
 }
-module.exports = { km, rankPoints, circlePoints };
+module.exports = { km, rankPoints, circlePoints, deal, markSeen, ROUNDS };

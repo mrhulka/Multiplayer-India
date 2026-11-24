@@ -16,4 +16,4 @@ Open the printed **LAN address** on the TV or laptop. Don't use `localhost`, or 
 - **Andaaza**: guess the number (cricket, history, ISRO, Bollywood…). The reveal shows every guess on a number line. Closest gets 1000, farthest gets 100, and an exact guess gets +200 on top.
 
 Each game has 8 rounds of 15 s. The host can go **Back to lobby** at any time and start the other game with the same players.
-Questions, places, Wikipedia photo pages and facts are in `questions.js`. No dependencies. `npm test` checks the scoring.
+**Question bank:** `questions.js` has 310 places (enough for 38 games) and 431 Andaaza questions (enough for 53 games). Questions never repeat until the whole bank has been used. The server records every question it asks in `seen.json`, and that record survives restarts. Delete `seen.json` to start over. No dependencies. `npm test` checks the scoring.
