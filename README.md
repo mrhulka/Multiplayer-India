@@ -6,7 +6,12 @@ Map Grab and Ball Park with Indian questions. The host screen (laptop/TV) shows 
 npm start
 ```
 
-Open the printed **LAN address** on the TV or laptop. Don't use `localhost`, or the QR link won't work on phones. Phones must be on the same Wi‑Fi.
+Everyone starts by entering their name. Then there are two ways to play:
+
+- **Same room**: open the printed **LAN address** on the TV or laptop and choose *Same room*. The screen shows a QR code and a room code. Players scan it on phones on the same Wi‑Fi. The TV shows the questions, maps and results.
+- **Play online**: choose *Play online* to get a link to share (Copy or Share). Everyone, the host included, plays on their own device and sees the full game: photo, map, number line and results. People outside your home network can only join if the server is reachable from the internet. Run it on a public host or behind a tunnel such as `cloudflared tunnel --url http://localhost:3000`.
+
+Refreshing the page puts you back into your game.
 
 - **Too Much Work**: the TV shows a photo or a place name. Players drop a pin on a label-free map of India on their phone. Rounds alternate between:
   - 📍 **Pin**: closest gets 1000, farthest gets 100, and everyone else is spaced evenly by rank.

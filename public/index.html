@@ -1,0 +1,244 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desi Party Games</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head><body class="phone"><main id="app"></main><script>
+const $ = q => document.querySelector(q), app = $('#app');
+const html = h => { app.innerHTML = h; scrollTo(0, 0); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+const post = (p, b) => fetch('/api/' + p, { method: 'POST', body: JSON.stringify(b) }).then(r => r.json());
+const fmt = n => Math.abs(n) >= 10000 ? n.toLocaleString('en-IN') : String(n);
+const ico = d => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const PIN = ico('<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>');
+const BARS = ico('<path d="M3 17h18M6 17v-3M12 17V9M18 17v-6"/>');
+const TV = ico('<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/>');
+const GLOBE = ico('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>');
+const PHONE = ico('<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>');
+const CHECK = ico('<path d="M5 12.5l4.5 4.5L19 7.5"/>');
+const GAMES = { map: { name: 'Too Much Work', icon: PIN, teal: false, blurb: 'Find the place on the map of India. Pin it, or gamble on a tight circle.' },
+                num: { name: 'Andaaza', icon: BARS, teal: true, blurb: 'Guess the number. Closest wins, bang on earns +200.' } };
+
+// session survives a refresh: { name, room, token?, id?, secret? }
+const store = { get() { try { return JSON.parse(sessionStorage.dpg || '{}'); } catch { return {}; } }, set(v) { try { sessionStorage.dpg = JSON.stringify(v); } catch {} } };
+let me = store.get(), S, key, tick, es, guess, maps = [];
+const linkRoom = new URLSearchParams(location.search).get('room')?.toUpperCase();
+if (linkRoom && me.room !== linkRoom) me = { name: me.name };
+const save = () => store.set(me);
+const isHost = () => !!me.token, isTv = () => isHost() && S?.play === 'tv', online = () => S?.play === 'online';
+const joinUrl = code => `${location.origin}/?room=${code}`;
+
+// ---------- entry: name first, then create or join ----------
+function nameScreen() {
+  html(`<div class="stack rise" style="margin-top:8vh;align-items:center;text-align:center">
+    <span class="icon wobble">${PHONE}</span><h1 class="hero">Aa jao!</h1><p class="muted">First things first. What should we call you?</p></div>
+    <form id="f" class="card stack rise" style="--d:.1s"><label>Your name<input id="n" maxlength="16" autocomplete="nickname" value="${esc(me.name)}" required></label>
+    <button>Let’s go</button></form>`);
+  $('#n').focus();
+  $('#f').onsubmit = e => { e.preventDefault(); me.name = $('#n').value.trim(); if (!me.name) return; save(); linkRoom ? join(linkRoom) : home(); };
+}
+function home(msg = '') {
+  document.body.className = 'phone';
+  html(`<div class="row rise"><span class="logo">Desi <span class="accent">Party</span> Games</span><button class="small ghost" id="rename">${esc(me.name)} · change</button></div>
+    ${msg ? `<p class="card center rise">${esc(msg)}</p>` : ''}
+    <h1 class="rise" style="--d:.05s">Start a game</h1>
+    <button class="choice rise" style="--d:.1s" data-play="tv"><span class="icon">${TV}</span><span><b>Same room</b><br><span class="muted">This screen goes on the TV. Everyone scans a QR code with their phone.</span></span></button>
+    <button class="choice rise" style="--d:.16s" data-play="online"><span class="icon teal">${GLOBE}</span><span><b>Play online</b><br><span class="muted">Get a link to share. Everyone plays on their own device, wherever they are.</span></span></button>
+    <form id="j" class="card stack rise" style="--d:.22s"><label>Got a room code?<input id="c" class="code" maxlength="4" autocomplete="off" required></label><button class="ghost">Join</button><p id="err" class="center accent" role="alert"></p></form>`);
+  $('#rename').onclick = nameScreen;
+  document.querySelectorAll('[data-play]').forEach(b => b.onclick = () => create(b.dataset.play));
+  $('#j').onsubmit = e => { e.preventDefault(); join($('#c').value.trim().toUpperCase()); };
+}
+async function create(play) {
+  const r = await post('room', { play, name: me.name });
+  me = { name: me.name, room: r.code, token: r.token, id: r.id, secret: r.secret }; save(); connect();
+}
+async function join(code) {
+  const r = await post('join', { room: code, name: me.name });
+  if (r.error) { const err = r.error === 'no room' ? `Couldn’t find room ${code}. Check the code?` : r.error; return $('#err') ? $('#err').textContent = err : home(err); }
+  me = { name: me.name, room: code, id: r.id, secret: r.secret }; save(); history.replaceState(null, '', '/?room=' + code); connect();
+}
+function connect() {
+  es?.close(); es = new EventSource('/api/events?room=' + me.room);
+  es.onmessage = e => render(JSON.parse(e.data));
+  es.onerror = () => { if (es.readyState === 2) { me = { name: me.name }; save(); history.replaceState(null, '', '/'); home('That room has ended. Start a new one?'); } };
+}
+
+// ---------- game screens ----------
+function render(s) {
+  S = s;
+  document.body.className = isTv() ? 'tv' : 'phone';
+  const k = [s.phase, s.round, s.game].join();
+  if (k !== key) { key = k; guess = null; clearInterval(tick); maps.forEach(m => m.remove()); maps = []; draw(s); }
+  syncChips($('#pills'), s.players, s.phase === 'question');
+  document.querySelectorAll('.game').forEach(g => g.setAttribute('aria-disabled', !s.players.length));
+  const c = $('#count'); if (c) c.textContent = s.phase === 'question' ? `${s.players.filter(p => p.answered).length} / ${s.players.length}` : `${s.players.length} joined`;
+}
+// add/remove chips in place so only new ones animate
+function syncChips(el, players, showDone) {
+  if (!el) return;
+  const have = new Map([...el.children].map(c => [c.dataset.id, c]));
+  for (const p of players) {
+    let c = have.get(p.id);
+    if (!c) { c = Object.assign(document.createElement('span'), { className: 'chip', textContent: p.name }); c.dataset.id = p.id; el.append(c); }
+    have.delete(p.id); c.classList.toggle('done', showDone && p.answered); c.classList.toggle('wait', showDone && !p.answered);
+  }
+  have.forEach(c => c.remove());
+}
+const mine = () => S.players.find(p => p.id === me.id);
+const lobbyBtn = () => isHost() ? '<button class="small ghost corner" id="lobby">Back to lobby</button>' : '';
+const gameCards = () => `<div class="games">${Object.entries(GAMES).map(([g, x], i) => `<button class="game rise" style="--d:${.2 + i * .1}s" data-game="${g}"><span class="icon ${x.teal ? 'teal' : ''}">${x.icon}</span><h2>${x.name}</h2><span class="muted">${x.blurb}</span><span class="go">Start · ${S.total} rounds</span></button>`).join('')}</div>`;
+const pills = (cls = '') => `<div class="chips ${cls}" id="pills"></div>`;
+
+function draw(s) {
+  ({ lobby, question, reveal, final })[s.phase](s);
+  $('#lobby') && ($('#lobby').onclick = () => post('lobby', { room: me.room, token: me.token }));
+  document.querySelectorAll('[data-game]').forEach(b => b.onclick = () => b.getAttribute('aria-disabled') !== 'true' && post('start', { room: me.room, token: me.token, game: b.dataset.game }));
+  countUp();
+}
+
+function lobby(s) {
+  if (isTv()) {
+    html(`<div class="lobby"><div class="card stack rise" style="align-items:center;text-align:center">
+        <span class="logo">Desi <span class="accent">Party</span> Games</span><div class="qr" id="qr"></div>
+        <p class="muted">Scan to join, or open <b style="color:var(--cream)">${esc(location.host)}</b> and enter</p>
+        <div class="tiles">${[...s.code].map((ch, i) => `<span class="pop" style="--d:${.1 + i * .08}s">${ch}</span>`).join('')}</div></div>
+      <div class="stack"><div class="row rise" style="--d:.1s"><h2 style="font-size:36px">Who’s playing</h2><span class="muted" id="count"></span></div>${pills()}${gameCards()}</div></div>`);
+    new QRCode($('#qr'), { text: joinUrl(s.code), width: 212, height: 212, colorDark: '#231A40', colorLight: '#FFF4E2' });
+  } else if (isHost()) { // online host
+    html(`<div class="row rise"><span class="logo">Desi <span class="accent">Party</span> Games</span><span class="pill">Room ${s.code}</span></div>
+      <div class="card stack rise" style="--d:.05s"><h2>Invite your friends</h2><p class="muted">Send them this link. They can join from anywhere.</p>
+        <div class="share"><input id="link" readonly value="${esc(joinUrl(s.code))}" aria-label="Invite link"><button class="small" id="copy">Copy</button></div>
+        ${navigator.share ? '<button class="ghost" id="shareBtn">Share invite</button>' : ''}</div>
+      <div class="row rise" style="--d:.1s"><h2>Who’s playing</h2><span class="muted" id="count"></span></div>${pills()}${gameCards()}`);
+    $('#copy').onclick = () => { $('#link').select(); navigator.clipboard?.writeText(joinUrl(s.code)); $('#copy').textContent = 'Copied!'; };
+    $('#shareBtn') && ($('#shareBtn').onclick = () => navigator.share({ title: 'Desi Party Games', text: `${me.name} invited you to play! Room ${s.code}`, url: joinUrl(s.code) }));
+  } else {
+    html(`<div class="stack rise" style="margin-top:6vh;align-items:center;text-align:center"><div class="check">${CHECK}</div>
+      <h1 class="hero">You’re in, ${esc(mine()?.name || me.name)}!</h1><p class="muted">Waiting for ${esc(s.host || 'the host')} to pick a game…</p></div>
+      <div class="row rise" style="--d:.1s"><span class="label">Players</span><span class="muted" id="count"></span></div>${pills()}`);
+  }
+}
+
+const left = s => Math.max(0, (s.endsAt - Date.now()) / 1000);
+function timer(s) {
+  const t = () => { const l = Math.ceil(left(s)); $('#t') && ($('#t').textContent = l); document.querySelector('.ring, .drain')?.classList.toggle('low', l <= 5); };
+  t(); tick = setInterval(t, 250);
+}
+const anim = s => `animation-duration:${s.secs}s;animation-delay:${-(s.secs - left(s))}s`;
+const dots = s => `<div class="dots" aria-label="Round ${s.round} of ${s.total}">${Array.from({ length: s.total }, (_, i) => `<i class="${i < s.round - 1 ? 'past' : i === s.round - 1 ? 'now' : ''}"></i>`).join('')}</div>`;
+const howTo = s => s.game === 'num' ? 'Type your andaaza' : s.mode === 'circle' ? 'Circle round · smaller circle, more points' : 'Pin round · closest wins';
+function promptBlock(s) {
+  if (s.game === 'num') return `<div class="card prompt rise"><h2>${esc(s.prompt)}${s.unit ? ` <span class="muted">(${esc(s.unit)})</span>` : ''}</h2></div>`;
+  const q = s.photoOnly ? 'Where is this?' : `Where is ${esc(s.prompt)}?`;
+  return s.img ? `<div class="photo"><img src="${esc(s.img)}" alt=""><h2>${q}</h2></div>` : `<div class="card prompt rise"><h2>${q}</h2></div>`;
+}
+const photoFallback = s => { const im = $('.photo img'); if (im) im.onerror = () => { im.remove(); $('.photo h2').textContent = `Where is ${s.prompt}?`; }; };
+
+function question(s) {
+  if (isTv()) {
+    html(`${lobbyBtn()}<div class="topbar rise"><div class="row"><span class="logo">${GAMES[s.game].name}</span><span class="pill">${howTo(s)}</span></div>
+      <div class="row">${dots(s)}<div class="ring"><svg viewBox="0 0 90 90"><circle cx="45" cy="45" r="38" class="track"/><circle cx="45" cy="45" r="38" class="bar" style="${anim(s)}"/></svg><span id="t"></span></div></div></div>
+      <div class="ask">${promptBlock(s)}<div class="card stack rise" style="--d:.15s"><div class="row"><b>Locked in</b><b style="color:var(--teal)" id="count"></b></div>${pills('list')}</div></div>`);
+    photoFallback(s); return timer(s);
+  }
+  // phone: online players also need the prompt, same-room players look at the TV
+  const ask = online() ? promptBlock(s) : `<h1 class="rise" style="font-size:28px">${s.game === 'num' ? esc(s.prompt) : s.photoOnly ? 'Where’s the place on the big screen?' : `Where is ${esc(s.prompt)}?`}</h1>`;
+  const top = `${lobbyBtn()}<div class="drain"><i style="${anim(s)}"></i></div><div class="row"><span class="label">Round ${s.round} of ${s.total} · ${howTo(s)}</span><b id="t" aria-label="seconds left"></b></div>${ask}`;
+  if (s.game === 'num') {
+    html(`${top}<form id="f" class="stack rise" style="--d:.1s"><input id="g" type="number" inputmode="decimal" step="any" placeholder="Your andaaza${s.unit ? ' (' + esc(s.unit) + ')' : ''}" aria-label="Your answer" required><button>Lock it in</button></form>`);
+    $('#g').focus();
+    $('#f').onsubmit = e => { e.preventDefault(); guess = +$('#g').value; submit(); };
+  } else {
+    const circle = s.mode === 'circle';
+    html(`${top}<div id="m" class="map ${online() ? 'small' : ''} rise" style="--d:.08s"></div>
+      ${circle ? `<div class="card slider"><label for="r" class="row"><span>Circle size · <span id="rl">300</span> km</span><span class="accent" id="rp">up to 700 pts</span></label><input id="r" type="range" min="25" max="1000" step="25" value="300"><div class="row muted" style="font-size:13px"><span>Risky · more points</span><span>Safe · fewer points</span></div></div>` : ''}
+      <button id="s" disabled>${circle ? 'Tap the map, then lock it in' : 'Tap the map to drop your pin'}</button>`);
+    photoFallback(s);
+    const m = L.map('m', { zoomControl: false, attributionControl: true }).setView([22.5, 80], 4); maps.push(m);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(m); // no labels: no free answers
+    let pin, ring;
+    const upd = () => { if (!pin) return; guess = { ...pin.getLatLng(), radius: circle ? +$('#r').value : undefined };
+      if (circle) { ring ? ring.setLatLng(guess).setRadius(guess.radius * 1000) : (ring = L.circle(guess, { radius: guess.radius * 1000, color: '#F7A83E', weight: 3, fillOpacity: .2 }).addTo(m)); }
+      $('#s').disabled = false; $('#s').textContent = 'Lock it in'; };
+    m.on('click', e => { pin ? pin.setLatLng(e.latlng) : (pin = L.marker(e.latlng).addTo(m)); upd(); });
+    if (circle) $('#r').oninput = () => { const v = +$('#r').value; $('#rl').textContent = v; $('#rp').textContent = `up to ${Math.max(100, 1000 - v)} pts`; upd(); };
+    $('#s').onclick = submit;
+  }
+  timer(s);
+}
+async function submit() {
+  if (guess == null || Number.isNaN(guess)) return;
+  const k = key, r = await post('answer', { room: me.room, id: me.id, secret: me.secret, guess });
+  if (r.error || key !== k) return; // the reveal can arrive before our own reply: don't cover it
+  clearInterval(tick); maps.forEach(m => m.remove()); maps = [];
+  html(`${lobbyBtn()}<div class="locked"><div class="check">${CHECK}</div><h1 class="hero">Locked in!</h1>
+    <p class="muted">${online() ? 'Waiting for the others…' : 'Eyes on the big screen.'}</p></div>${online() ? `<div class="row"><span class="label">Answered</span><span class="muted" id="count"></span></div>${pills()}` : ''}`);
+  syncChips($('#pills'), S.players, true);
+}
+
+function reveal(s) {
+  const r = s.reveal, map = s.game === 'map', you = r.results.find(x => x.id === me.id);
+  const head = map ? `<h1 class="big slam">${esc(r.name)}</h1>` : `<p class="muted center rise">${esc(s.prompt)}</p><div class="answer slam" style="--d:.2s">${fmt(r.answer)}${r.unit ? `<small> ${esc(r.unit)}</small>` : ''}</div>`;
+  const fact = r.fact ? `<div class="card fact rise" style="--d:.5s">${r.img ? `<img src="${esc(r.img)}" alt="" onerror="this.remove()">` : ''}<p><span class="label">Did you know?</span><br>${esc(r.fact)}</p></div>` : '';
+  const detail = x => map ? `${fmt(x.err)} km off${x.guess.radius ? ` · ${Math.round(x.guess.radius)} km circle` : ''}` : x.exact ? 'bang on! +200' : `off by ${fmt(x.err)}`;
+  const cards = r.results.length ? `<div class="results">${r.results.map((x, i) => `<div class="res rise ${i === 0 && x.points ? 'best' : ''}" style="--d:${1.1 + i * .09}s"><b>${esc(x.name)}</b><span class="pts" data-count="${x.points}" data-prefix="+">+0</span><small>${detail(x)}</small></div>`).join('')}</div>` : '<p class="card center muted">Nobody answered!</p>';
+  const full = `${head}${map ? '<div id="m" class="map rise" style="--d:.2s"></div>' : scale(r)}${fact}${cards}`;
+  const bar = `<div class="topbar rise"><span class="logo">${GAMES[s.game].name}</span><span class="muted">Round ${s.round} of ${s.total}</span></div>`;
+  if (isTv()) html(lobbyBtn() + bar + full);
+  else {
+    const p = you?.points ?? 0, tot = mine()?.score ?? 0;
+    const rank = [...S.players].sort((a, b) => b.score - a.score).findIndex(x => x.id === me.id) + 1;
+    html(`${lobbyBtn()}<div class="stack" style="align-items:center;text-align:center;padding-top:20px">
+      <span class="label rise">${!you ? 'Too slow!' : you.exact ? 'Bang on!' : map && you.guess.radius ? (p ? 'Inside your circle!' : 'Missed your circle') : `${detail(you)}`}</span>
+      <div class="points slam ${p ? '' : 'zero'}" style="--d:.15s" data-count="${p}" data-prefix="+">+0</div>
+      <div class="row rise" style="--d:.35s;justify-content:center"><span class="pill">Total ${fmt(tot)}</span><span class="pill" style="background:var(--gold);color:var(--gold-ink)">#${rank} of ${S.players.length}</span></div></div>
+      ${online() ? full : fact}`);
+    if (you?.exact || (p && you === r.results[0])) confetti();
+  }
+  if (map && $('#m')) {
+    const m = L.map('m'), pts = [[r.answer.lat, r.answer.lng]]; maps.push(m);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(m);
+    L.circleMarker(pts[0], { radius: 12, color: '#34C6B3', fillColor: '#34C6B3', fillOpacity: 1 }).addTo(m).bindTooltip(esc(r.name), { permanent: true });
+    r.results.forEach(x => { const p = [x.guess.lat, x.guess.lng]; pts.push(p);
+      L.marker(p).addTo(m).bindTooltip(esc(x.name), { permanent: true }); L.polyline([pts[0], p], { color: '#F7A83E', dashArray: '6', weight: 3 }).addTo(m);
+      if (x.guess.radius) L.circle(p, { radius: x.guess.radius * 1000, color: x.points ? '#34C6B3' : '#FF8A7A' }).addTo(m); });
+    m.fitBounds(pts, { padding: [40, 40], maxZoom: 7 });
+  }
+}
+// number line: answer as a teal beam, guesses alternating below/above
+function scale(r) {
+  const vals = [r.answer, ...r.results.map(x => x.guess)], lo = Math.min(...vals), hi = Math.max(...vals), pos = v => 5 + 90 * (v - lo) / (hi - lo || 1);
+  return `<div class="scale"><div class="line"></div><div class="beam" style="left:${pos(r.answer)}%"></div>` +
+    r.results.map((x, i) => `<div class="mark ${i % 2 ? 'up' : 'down'} ${x.exact ? 'hit' : ''}" style="left:${pos(x.guess)}%;--d:${.9 + i * .09}s"><i></i><b>${esc(x.name)}</b><span>${fmt(x.guess)}</span></div>`).join('') + '</div>';
+}
+
+function final(s) {
+  const board = [...s.players].sort((a, b) => b.score - a.score), rank = board.findIndex(p => p.id === me.id) + 1;
+  const list = `<div class="board">${board.map((p, i) => `<div class="rise" style="--d:${.4 + i * .1}s"><span class="n">${i + 1}</span><span>${esc(p.name)}</span><span data-count="${p.score}">0</span></div>`).join('')}</div>`;
+  const again = isHost() ? `<p class="center muted">Play again?</p>${gameCards()}` : `<p class="center muted">Waiting for ${esc(s.host || 'the host')}…</p>`;
+  if (isTv()) html(`${lobbyBtn()}<h1 class="big slam">${esc(board[0]?.name || 'Nobody')} wins!</h1>${list}${again}`);
+  else html(`${lobbyBtn()}<h1 class="big slam">${rank === 1 ? 'You win!' : '#' + rank}</h1><p class="center muted rise">${fmt(mine()?.score ?? 0)} points</p>${list}${again}`);
+  if (isTv() || rank === 1) confetti();
+}
+
+function countUp() {
+  document.querySelectorAll('[data-count]').forEach(el => {
+    const to = +el.dataset.count, pre = el.dataset.prefix || '', delay = parseFloat(getComputedStyle(el.closest('[style*="--d"]') || el).getPropertyValue('--d')) || 0;
+    const t0 = performance.now() + delay * 1000 + 300, step = t => { const k = Math.min(1, Math.max(0, (t - t0) / 900)); el.textContent = pre + fmt(Math.round(to * (1 - (1 - k) ** 3))); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+}
+function confetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const box = Object.assign(document.createElement('div'), { className: 'confetti' });
+  box.innerHTML = Array.from({ length: 40 }, () => `<i style="left:${Math.random() * 100}vw;background:${['#F7A83E', '#34C6B3', '#FF8A7A', '#FFF4E2'][Math.random() * 4 | 0]}; animation-delay:${Math.random() * .8}s; animation-duration:${2 + Math.random() * 1.5}s"></i>`).join('');
+  app.append(box); setTimeout(() => box.remove(), 4500);
+}
+
+// ---------- start ----------
+if (!me.name) nameScreen(); else if (me.room) connect(); else if (linkRoom) join(linkRoom); else home();
+</script></body></html>

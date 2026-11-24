@@ -29,7 +29,7 @@ function rankPoints(errs) {
 // circle mode: answer inside your circle scores 1000 - radius(km), min 100; outside scores 0
 const circlePoints = (dist, radius) => dist <= radius ? Math.max(100, Math.round(1000 - radius)) : 0;
 
-const pub = r => ({ code: r.code, phase: r.phase, game: r.game, mode: r.mode, round: r.round, total: ROUNDS, endsAt: r.endsAt,
+const pub = r => ({ code: r.code, play: r.play, host: r.host, secs: ASK_MS / 1000, phase: r.phase, game: r.game, mode: r.mode, round: r.round, total: ROUNDS, endsAt: r.endsAt,
   prompt: r.q && (r.game === 'map' ? r.q.name : r.q[0]), img: r.q?.img, photoOnly: !!(r.q?.wiki && r.q?.img), unit: r.game === 'num' ? r.q?.[2] : undefined,
   players: Object.entries(r.players).map(([id, p]) => ({ id, name: p.name, score: p.score, answered: id in r.answers })),
   reveal: r.reveal });
@@ -57,9 +57,10 @@ function reveal(r) {
 
 const host = (r, b) => { if (b.token !== r.token) throw 'not host'; };
 const api = {
-  room() { let code; do code = Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[crypto.randomInt(24)]).join(''); while (rooms[code]);
-    rooms[code] = { code, token: crypto.randomUUID(), phase: 'lobby', players: {}, answers: {}, clients: new Set(), round: 0 };
-    return { code, token: rooms[code].token }; },
+  // play 'tv': this device is the big screen; 'online': no shared screen, the host plays from their own device too
+  room(_, b) { let code; do code = Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[crypto.randomInt(24)]).join(''); while (rooms[code]);
+    const r = rooms[code] = { code, play: b.play === 'online' ? 'online' : 'tv', host: String(b.name || '').trim().slice(0, 16), token: crypto.randomUUID(), phase: 'lobby', players: {}, answers: {}, clients: new Set(), round: 0 };
+    return { code, token: r.token, play: r.play, ...(r.play === 'online' ? api.join(r, b) : {}) }; },
   join(r, b) { const name = String(b.name || '').trim().slice(0, 16); if (!name) throw 'name required';
     const id = crypto.randomUUID(), secret = crypto.randomUUID(); r.players[id] = { name, score: 0, secret }; send(r); return { id, secret }; },
   start(r, b) { host(r, b); if (!Q[b.game]) throw 'bad game';
@@ -86,10 +87,13 @@ const server = http.createServer((req, res) => {
     return req.on('end', () => { try { const b = JSON.parse(body || '{}'), r = rooms[String(b.room || '').toUpperCase()];
       if (fn !== api.room && !r) throw 'no room'; json(200, fn(r, b)); } catch (e) { json(400, { error: String(e) }); } });
   }
-  const file = path.join(__dirname, 'public', u.pathname === '/' ? 'host.html' : u.pathname === '/play' ? 'play.html' : path.normalize(u.pathname));
+  const file = path.join(__dirname, 'public', ['/', '/play'].includes(u.pathname) ? 'index.html' : path.normalize(u.pathname));
   if (!file.startsWith(path.join(__dirname, 'public'))) return json(403, {});
   fs.readFile(file, (e, d) => e ? json(404, {}) : (res.writeHead(200, { 'content-type': { html: 'text/html', css: 'text/css' }[file.split('.').pop()] || 'text/plain' }), res.end(d)));
 });
+
+// keep idle SSE connections alive through proxies/load balancers when played over the internet
+setInterval(() => Object.values(rooms).forEach(r => r.clients.forEach(c => c.write(': ping\n\n'))), 25000).unref();
 
 if (require.main === module) {
   const port = process.env.PORT || 3000;
