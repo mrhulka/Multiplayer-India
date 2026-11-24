@@ -45,7 +45,7 @@ function home(msg = '') {
   html(`<div class="row rise"><span class="logo">Desi <span class="accent">Party</span> Games</span><button class="small ghost" id="rename">${esc(me.name)} · change</button></div>
     ${msg ? `<p class="card center rise">${esc(msg)}</p>` : ''}
     <h1 class="rise" style="--d:.05s">Start a game</h1>
-    <button class="choice rise" style="--d:.1s" data-play="tv"><span class="icon">${TV}</span><span><b>Same room</b><br><span class="muted">This screen goes on the TV. Everyone scans a QR code with their phone.</span></span></button>
+    <button class="choice rise" style="--d:.1s" data-play="tv"><span class="icon">${TV}</span><span><b>Same room</b><br><span class="muted">Put this screen where everyone can see it: a laptop, TV or tablet. Everyone scans a QR code with their phone.</span></span></button>
     <button class="choice rise" style="--d:.16s" data-play="online"><span class="icon teal">${GLOBE}</span><span><b>Play online</b><br><span class="muted">Get a link to share. Everyone plays on their own device, wherever they are.</span></span></button>
     <form id="j" class="card stack rise" style="--d:.22s"><label>Got a room code?<input id="c" class="code" maxlength="4" autocomplete="off" required></label><button class="ghost">Join</button><p id="err" class="center accent" role="alert"></p></form>`);
   $('#rename').onclick = nameScreen;
@@ -145,8 +145,8 @@ function question(s) {
       <div class="ask">${promptBlock(s)}<div class="card stack rise" style="--d:.15s"><div class="row"><b>Locked in</b><b style="color:var(--teal)" id="count"></b></div>${pills('list')}</div></div>`);
     photoFallback(s); return timer(s);
   }
-  // phone: online players also need the prompt, same-room players look at the TV
-  const ask = online() ? promptBlock(s) : `<h1 class="rise" style="font-size:28px">${s.game === 'num' ? esc(s.prompt) : s.photoOnly ? 'Where’s the place on the big screen?' : `Where is ${esc(s.prompt)}?`}</h1>`;
+  // phone: online players also need the prompt, same-room players look at the host screen
+  const ask = online() ? promptBlock(s) : `<h1 class="rise" style="font-size:28px">${s.game === 'num' ? esc(s.prompt) : s.photoOnly ? 'Where’s the place on the host screen?' : `Where is ${esc(s.prompt)}?`}</h1>`;
   const top = `${lobbyBtn()}<div class="drain"><i style="${anim(s)}"></i></div><div class="row"><span class="label">Round ${s.round} of ${s.total} · ${howTo(s)}</span><b id="t" aria-label="seconds left"></b></div>${ask}`;
   if (s.game === 'num') {
     html(`${top}<form id="f" class="stack rise" style="--d:.1s"><input id="g" type="number" inputmode="decimal" step="any" placeholder="Your andaaza${s.unit ? ' (' + esc(s.unit) + ')' : ''}" aria-label="Your answer" required><button>Lock it in</button></form>`);
@@ -176,7 +176,7 @@ async function submit() {
   if (r.error || key !== k) return; // the reveal can arrive before our own reply: don't cover it
   clearInterval(tick); maps.forEach(m => m.remove()); maps = [];
   html(`${lobbyBtn()}<div class="locked"><div class="check">${CHECK}</div><h1 class="hero">Locked in!</h1>
-    <p class="muted">${online() ? 'Waiting for the others…' : 'Eyes on the big screen.'}</p></div>${online() ? `<div class="row"><span class="label">Answered</span><span class="muted" id="count"></span></div>${pills()}` : ''}`);
+    <p class="muted">${online() ? 'Waiting for the others…' : 'Eyes on the host screen.'}</p></div>${online() ? `<div class="row"><span class="label">Answered</span><span class="muted" id="count"></span></div>${pills()}` : ''}`);
   syncChips($('#pills'), S.players, true);
 }
 
