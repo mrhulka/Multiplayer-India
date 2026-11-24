@@ -29,6 +29,8 @@ const linkRoom = new URLSearchParams(location.search).get('room')?.toUpperCase()
 if (linkRoom && me.room !== linkRoom) me = { name: me.name };
 const save = () => store.set(me);
 const isHost = () => !!me.token, isTv = () => isHost() && S?.play === 'tv', online = () => S?.play === 'online';
+// Esri basemaps: free, no API key. ponytail: switch to a keyed provider if usage outgrows Esri's free terms
+const tiles = name => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/${name}/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 16, attribution: 'Tiles © Esri' });
 const joinUrl = code => `${location.origin}/?room=${code}`;
 
 // ---------- entry: name first, then create or join ----------
@@ -159,7 +161,7 @@ function question(s) {
       <button id="s" disabled>${circle ? 'Tap the map, then lock it in' : 'Tap the map to drop your pin'}</button>`);
     photoFallback(s);
     const m = L.map('m', { zoomControl: false, attributionControl: true }).setView([22.5, 80], 4); maps.push(m);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(m); // no labels: no free answers
+    tiles('Canvas/World_Light_Gray_Base').addTo(m); // no labels: no free answers
     let pin, ring;
     const upd = () => { if (!pin) return; guess = { ...pin.getLatLng(), radius: circle ? +$('#r').value : undefined };
       if (circle) { ring ? ring.setLatLng(guess).setRadius(guess.radius * 1000) : (ring = L.circle(guess, { radius: guess.radius * 1000, color: '#F7A83E', weight: 3, fillOpacity: .2 }).addTo(m)); }
@@ -201,7 +203,7 @@ function reveal(s) {
   }
   if (map && $('#m')) {
     const m = L.map('m'), pts = [[r.answer.lat, r.answer.lng]]; maps.push(m);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(m);
+    tiles('World_Street_Map').addTo(m);
     L.circleMarker(pts[0], { radius: 12, color: '#34C6B3', fillColor: '#34C6B3', fillOpacity: 1 }).addTo(m).bindTooltip(esc(r.name), { permanent: true });
     r.results.forEach(x => { const p = [x.guess.lat, x.guess.lng]; pts.push(p);
       L.marker(p).addTo(m).bindTooltip(esc(x.name), { permanent: true }); L.polyline([pts[0], p], { color: '#F7A83E', dashArray: '6', weight: 3 }).addTo(m);
