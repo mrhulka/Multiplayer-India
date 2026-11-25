@@ -1,6 +1,6 @@
-// Question bank. Too Much Work: P(name, lat, lng, wikiPageTitle|null, fact). With a wiki title, the TV shows that page's photo instead of the name.
+// Question bank. Too Much Work: P(name, lat, lng, wikiPageTitle|null, fact, photoUrl?). With a wiki title and a photo, the host screen shows only the photo (a photo round).
 // Andaaza: [question, answer, unit]. Keep answers to fixed facts (no live stats that change).
-const P = (name, lat, lng, wiki, fact) => ({ name, lat, lng, wiki, fact });
+const P = (name, lat, lng, wiki, fact, img) => ({ name, lat, lng, wiki, fact, img });
 exports.map = [
   // --- Delhi, UP, Uttarakhand ---
   P("Taj Mahal, Agra", 27.1751, 78.0421, "Taj_Mahal", "Shah Jahan built it for Mumtaz Mahal. Around 20,000 artisans worked on it for over two decades."),
