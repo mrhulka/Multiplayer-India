@@ -1,5 +1,5 @@
-// Question bank. Too Much Work: P(name, lat, lng, wikiPageTitle|null, fact, photoUrl?). With a wiki title and a photo, the host screen shows only the photo (a photo round).
-// Andaaza: [question, answer, unit]. Keep answers to fixed facts (no live stats that change).
+// Question bank. AtaaPataa: P(name, lat, lng, wikiPageTitle|null, fact, photoUrl?). With a wiki title and a photo, the host screen shows only the photo (a photo round).
+// Andaaza Apna Apna: [question, answer, unit]. Keep answers to fixed facts (no live stats that change).
 const P = (name, lat, lng, wiki, fact, img) => ({ name, lat, lng, wiki, fact, img });
 exports.map = [
   // --- Delhi, UP, Uttarakhand ---
