@@ -1,7 +1,7 @@
 // Game rules and room state, shared by the Node server (server.js) and the Cloudflare Worker (worker/index.js).
 const randInt = n => crypto.getRandomValues(new Uint32Array(1))[0] % n; // Web Crypto: same in Node and Workers
 const Q = require('./questions');
-const ROUNDS = 8, ASK_MS = 15000, REVEAL_MS = 10000, EXACT_BONUS = 200, MIN_R = 25, MAX_R = 1000;
+const ROUNDS = 8, ASK_MS = 25000, REVEAL_MS = 10000, EXACT_BONUS = 200, MIN_R = 25, MAX_R = 1000;
 const rooms = {};
 // No-repeat: remember every question asked (across rooms and restarts) and only deal unseen ones until the bank runs out.
 // ponytail: one history per server, which suits a household; key it per room or group if many groups share a server

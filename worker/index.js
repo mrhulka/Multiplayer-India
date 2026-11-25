@@ -2,6 +2,8 @@
 import game from '../game.js';
 import page from '../public/index.html';
 import css from '../public/style.css';
+import india from '../public/india-states.json';
+const indiaJson = JSON.stringify(india);
 // ponytail: the two static files are bundled into the Worker; switch to Workers static assets if public/ grows images
 
 // ponytail: one Durable Object holds every room (same as the single Node process); shard by room code if it ever gets busy
@@ -30,6 +32,7 @@ export default {
   fetch(req, env) {
     const { pathname } = new URL(req.url);
     if (pathname.startsWith('/api/')) return env.HUB.get(env.HUB.idFromName('global')).fetch(req);
+    if (pathname === '/india-states.json') return new Response(indiaJson, { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=86400' } });
     return pathname === '/style.css' ? file(css, 'text/css; charset=utf-8') : file(page, 'text/html; charset=utf-8'); // every other path is the app
   },
 };

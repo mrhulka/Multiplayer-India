@@ -17,7 +17,7 @@ const server = http.createServer((req, res) => {
   }
   const file = path.join(__dirname, 'public', ['/', '/play'].includes(u.pathname) ? 'index.html' : path.normalize(u.pathname));
   if (!file.startsWith(path.join(__dirname, 'public'))) return json(403, {});
-  fs.readFile(file, (e, d) => e ? json(404, {}) : (res.writeHead(200, { 'content-type': { html: 'text/html', css: 'text/css' }[file.split('.').pop()] || 'text/plain' }), res.end(d)));
+  fs.readFile(file, (e, d) => e ? json(404, {}) : (res.writeHead(200, { 'content-type': { html: 'text/html', css: 'text/css', json: 'application/json' }[file.split('.').pop()] || 'text/plain' }), res.end(d)));
 });
 setInterval(game.ping, 25000).unref();
 
