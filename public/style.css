@@ -24,7 +24,7 @@ button:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--gold-deep)
 button:disabled { opacity: .45; cursor: not-allowed; }
 button.ghost { background: var(--raised); color: var(--cream); box-shadow: 0 6px 0 #1B1433; }
 button.small { font-size: 15px; padding: 10px 16px; border-radius: 12px; box-shadow: none; }
-button.corner { position: fixed; top: 14px; right: 14px; z-index: 1000; }
+button.corner { align-self: flex-end; margin-bottom: -8px; }
 button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 a { color: var(--gold); }
 input { font: 800 22px Nunito, sans-serif; width: 100%; padding: 14px; border-radius: 16px; border: 2px solid var(--raised); background: var(--raised); color: var(--cream); text-align: center; }
