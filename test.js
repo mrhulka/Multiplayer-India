@@ -21,6 +21,12 @@ assert.strictEqual(sp('', ['Kajol']), 0);
 assert.strictEqual(sp('Kareena Kapoor', ['Kareena Kapoor Khan', 'Kareena Kapoor']), 1000); // accepted alternate
 for (const q of Q.face) assert(q[0] && q[1] && (!q[2] || Array.isArray(q[2])), 'bad clue ' + q[0]);
 
+// Dimaag Ka Dahi: right + instant = 1000, right at the buzzer = 500, wrong = 0; every puzzle has 4 distinct options
+const { quizPoints } = require('./game');
+assert.strictEqual(quizPoints(true, 0, 30000), 1000); assert.strictEqual(quizPoints(true, 30000, 30000), 500);
+assert.strictEqual(quizPoints(true, 15000, 30000), 750); assert.strictEqual(quizPoints(false, 10, 30000), 0);
+for (const q of Q.dahi) assert(q[3] && new Set([q[1], ...q[2]]).size === 4, 'bad puzzle: ' + q[0]);
+
 // question bank sanity
 const dup = a => a.filter((x, i) => a.indexOf(x) !== i);
 assert.deepStrictEqual(dup(Q.map.map(p => p.name)), []);
@@ -34,9 +40,9 @@ const missing = Q.map.filter(p => p.img && !fs.existsSync(`${__dirname}/photos/$
 assert.deepStrictEqual(missing, [], 'photos missing: ' + missing.join(', '));
 
 // no repeats until the whole bank has been dealt, then it cycles
-for (const [game, key] of [['map', q => q.name], ['num', q => q[0]], ['face', q => q[0]]]) {
+for (const [game, key] of [['map', q => q.name], ['num', q => q[0]], ['face', q => q[0]], ['dahi', q => q[0]]]) {
   const asked = new Set(), games = Math.floor(Q[game].length / ROUNDS);
   for (let g = 0; g < games; g++) for (const q of deal(game)) { assert(!asked.has(key(q)), 'repeat: ' + key(q)); asked.add(key(q)); markSeen(game, q); }
   assert.strictEqual(deal(game).length, ROUNDS); // exhausted → fresh cycle
 }
-console.log(`ok · ${Q.map.length} places · ${Q.num.length} Andaaza · ${Q.face.length} celebrities (at 8 rounds: ${[Q.map, Q.num, Q.face].map(b => Math.floor(b.length / ROUNDS)).join(' / ')} games with no repeats)`);
+console.log(`ok · ${Q.map.length} places · ${Q.num.length} Andaaza · ${Q.face.length} celebrities · ${Q.dahi.length} puzzles (at 8 rounds: ${[Q.map, Q.num, Q.face, Q.dahi].map(b => Math.floor(b.length / ROUNDS)).join(' / ')} games with no repeats)`);

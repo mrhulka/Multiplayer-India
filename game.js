@@ -6,7 +6,7 @@ const slug = n => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, 
 const photo = q => q?.img ? `/photos/${slug(q.name)}.jpg` : undefined;
 const ROUNDS = 8, MIN_ROUNDS = 3, MAX_ROUNDS = 20, EXACT_BONUS = 200, MIN_R = 25, MAX_R = 1000;
 // per game: seconds to answer, seconds the results stay up before the next question
-const CFG = { map: { ask: 25000, reveal: 10000 }, num: { ask: 25000, reveal: 3000 }, face: { ask: 25000, reveal: 6000 } };
+const CFG = { map: { ask: 25000, reveal: 10000 }, num: { ask: 25000, reveal: 3000 }, face: { ask: 25000, reveal: 6000 }, dahi: { ask: 30000, reveal: 8000 } };
 const rooms = {};
 // No-repeat: remember every question asked (across rooms and restarts) and only deal unseen ones until the bank runs out.
 // ponytail: one history per server, which suits a household; key it per room or group if many groups share a server
@@ -42,6 +42,8 @@ function edits(a, b) { // Levenshtein distance
   for (let i = 1; i <= a.length; i++) { const cur = [i]; for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
   return prev[b.length];
 }
+// Dimaag Ka Dahi: right answer scores 1000 if instant, sliding to 500 at the buzzer; wrong scores 0
+const quizPoints = (right, ms, askMs) => right ? Math.round(500 + 500 * Math.max(0, 1 - ms / askMs)) : 0;
 function spellPoints(typed, answers) {
   const t = norm(typed); if (!t) return { points: 0, exact: false };
   const best = Math.min(...answers.map(a => edits(t, norm(a)) / Math.max(t.length, norm(a).length)));
@@ -50,7 +52,7 @@ function spellPoints(typed, answers) {
 
 const cfg = r => CFG[r.game] || CFG.map;
 const pub = r => ({ code: r.code, play: r.play, host: r.host, secs: cfg(r).ask / 1000, phase: r.phase, game: r.game, mode: r.mode, round: r.round, total: r.rounds || ROUNDS, endsAt: r.endsAt,
-  prompt: r.q && (r.game === 'face' ? r.q[1] : r.q.name ?? r.q[0]),
+  prompt: r.q && (r.game === 'face' ? r.q[1] : r.q.name ?? r.q[0]), options: r.game === 'dahi' && r.phase === 'question' ? r.opts : undefined,
   img: photo(r.q), photoOnly: !!(r.q?.wiki && r.q?.img), next: r.phase === 'reveal' ? photo(r.deck?.[r.round]) : undefined, unit: r.game === 'num' ? r.q?.[2] : undefined,
   players: Object.entries(r.players).map(([id, p]) => ({ id, name: p.name, score: p.score, answered: id in r.answers })),
   reveal: r.reveal });
@@ -60,13 +62,18 @@ function ask(r) {
   if (r.round >= r.rounds) { r.phase = 'final'; r.q = null; return send(r); }
   r.q = r.deck[r.round++]; markSeen(r.game, r.q); r.answers = {}; r.reveal = null; r.phase = 'question'; r.askedAt = Date.now(); r.endsAt = r.askedAt + cfg(r).ask;
   r.mode = r.game === 'map' && r.round % 2 === 0 ? 'circle' : 'pin'; // alternate pin / circle rounds
+  if (r.game === 'dahi') r.opts = shuffle([r.q[1], ...r.q[2]]);
   clearTimeout(r.timer); r.timer = setTimeout(() => reveal(r), cfg(r).ask); send(r);
 }
 function reveal(r) {
   clearTimeout(r.timer);
   const game = r.game, ids = Object.keys(r.answers);
   let pts, errs = {}, ans, extra = {};
-  if (game === 'face') {
+  if (game === 'dahi') {
+    const right = r.opts.indexOf(r.q[1]); ans = r.q[1];
+    pts = Object.fromEntries(ids.map(id => [id, quizPoints(r.answers[id].pick === right, r.answers[id].ms, cfg(r).ask)]));
+    extra = { options: r.opts, right, picks: r.opts.map((_, i) => ids.filter(id => r.answers[id].pick === i).map(id => r.players[id].name)) };
+  } else if (game === 'face') {
     ans = r.q[0];
     const sp = Object.fromEntries(ids.map(id => [id, spellPoints(r.answers[id].text, [r.q[0], ...(r.q[2] || [])])]));
     pts = Object.fromEntries(ids.map(id => [id, sp[id].points])); extra = { clue: r.q[1], exactIds: ids.filter(id => sp[id].exact) };
@@ -78,10 +85,10 @@ function reveal(r) {
   }
   for (const id in pts) r.players[id].score += pts[id];
   r.reveal = { answer: ans, unit: game === 'map' ? 'km' : game === 'num' ? r.q[2] : undefined, img: photo(r.q), name: game === 'map' ? r.q.name : game === 'face' ? r.q[0] : undefined,
-    fact: game === 'face' ? extra.clue : r.q.fact,
+    fact: game === 'face' ? extra.clue : game === 'dahi' ? r.q[3] : r.q.fact, options: extra.options, right: extra.right, picks: extra.picks,
     results: ids.map(id => ({ id, name: r.players[id].name, points: pts[id], err: errs[id],
-      guess: game === 'face' ? r.answers[id].text : r.answers[id],
-      exact: game === 'num' ? errs[id] === 0 : game === 'face' ? extra.exactIds.includes(id) : false })).sort((a, b) => b.points - a.points) };
+      guess: game === 'face' ? r.answers[id].text : game === 'dahi' ? r.opts[r.answers[id].pick] : r.answers[id], ms: r.answers[id].ms,
+      exact: game === 'num' ? errs[id] === 0 : game === 'face' ? extra.exactIds.includes(id) : game === 'dahi' ? r.answers[id].pick === extra.right : false })).sort((a, b) => b.points - a.points) };
   r.phase = 'reveal'; send(r); r.timer = setTimeout(() => ask(r), cfg(r).reveal);
 }
 
@@ -100,7 +107,8 @@ const api = {
   lobby(r, b) { host(r, b); clearTimeout(r.timer); Object.assign(r, { phase: 'lobby', q: null, reveal: null, answers: {}, round: 0 }); send(r); return {}; },
   answer(r, b) { if (r.phase !== 'question' || r.players[b.id]?.secret !== b.secret) throw 'not now';
     let g;
-    if (r.game === 'face') { const text = String(b.guess ?? '').trim().slice(0, 60); if (!norm(text)) throw 'bad guess'; g = { text }; }
+    if (r.game === 'dahi') { const pick = +b.guess; if (!Number.isInteger(pick) || pick < 0 || pick >= r.opts.length) throw 'bad guess'; g = { pick, ms: Date.now() - r.askedAt }; }
+    else if (r.game === 'face') { const text = String(b.guess ?? '').trim().slice(0, 60); if (!norm(text)) throw 'bad guess'; g = { text }; }
     else {
       g = r.game === 'map' ? { lat: +b.guess?.lat, lng: +b.guess?.lng } : +b.guess;
       if (r.mode === 'circle') g.radius = Math.min(MAX_R, Math.max(MIN_R, +b.guess?.radius));
@@ -121,4 +129,4 @@ function call(name, b) {
 // keep idle SSE connections alive through proxies
 const ping = () => Object.values(rooms).forEach(r => r.clients.forEach(c => c.write(': ping\n\n')));
 
-module.exports = { spellPoints, slug, call, getRoom, snapshot, ping, useSeen, km, rankPoints, circlePoints, deal, markSeen, ROUNDS };
+module.exports = { quizPoints, spellPoints, slug, call, getRoom, snapshot, ping, useSeen, km, rankPoints, circlePoints, deal, markSeen, ROUNDS };
