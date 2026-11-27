@@ -8,7 +8,7 @@ const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x'), json = (c, o) => { res.writeHead(c, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
   if (u.pathname === '/api/events') {
     const r = game.getRoom(u.searchParams.get('room')); if (!r) return json(404, { error: 'no room' });
-    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', 'x-accel-buffering': 'no' });
     r.clients.add(res); req.on('close', () => r.clients.delete(res)); res.write(game.snapshot(r)); return;
   }
   if (u.pathname.startsWith('/api/') && req.method === 'POST') {

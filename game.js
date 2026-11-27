@@ -51,7 +51,7 @@ function spellPoints(typed, answers) {
 }
 
 const cfg = r => CFG[r.game] || CFG.map;
-const pub = r => ({ code: r.code, play: r.play, host: r.host, secs: cfg(r).ask / 1000, phase: r.phase, game: r.game, mode: r.mode, round: r.round, total: r.rounds || ROUNDS, endsAt: r.endsAt,
+const pub = r => ({ v: r.v = (r.v || 0) + 1, now: Date.now(), code: r.code, play: r.play, host: r.host, secs: cfg(r).ask / 1000, phase: r.phase, game: r.game, mode: r.mode, round: r.round, total: r.rounds || ROUNDS, endsAt: r.endsAt,
   prompt: r.q && (r.game === 'face' ? r.q[1] : r.q.name ?? r.q[0]), options: r.game === 'dahi' && r.phase === 'question' ? r.opts : undefined,
   img: photo(r.q), photoOnly: !!(r.q?.wiki && r.q?.img), next: r.phase === 'reveal' ? photo(r.deck?.[r.round]) : undefined, unit: r.game === 'num' ? r.q?.[2] : undefined,
   players: Object.entries(r.players).map(([id, p]) => ({ id, name: p.name, score: p.score, answered: id in r.answers })),
@@ -118,7 +118,9 @@ const api = {
 };
 
 const getRoom = code => rooms[String(code || '').toUpperCase()];
-const snapshot = r => `data: ${JSON.stringify(pub(r))}\n\n`;
+// stream preamble: reconnect after 1s if dropped; 2 KB of padding pushes through proxies that buffer small chunks
+const preamble = `retry: 1000\n:${' '.repeat(2048)}\n\n`;
+const snapshot = r => preamble + `data: ${JSON.stringify(pub(r))}\n\n`;
 // run an API call by name; throws a string on bad input
 function call(name, b) {
   const fn = Object.hasOwn(api, name) && api[name], r = getRoom(b.room);

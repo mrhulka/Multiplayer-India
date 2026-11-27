@@ -19,7 +19,7 @@ export class Hub {
       const { readable, writable } = new TransformStream(), w = writable.getWriter(), enc = new TextEncoder();
       const c = { write: s => w.write(enc.encode(s)).catch(() => r.clients.delete(c)) };
       r.clients.add(c); c.write(game.snapshot(r));
-      return new Response(readable, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } });
+      return new Response(readable, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', 'x-accel-buffering': 'no' } });
     }
     if (req.method !== 'POST') return json({ error: 'not found' }, 404);
     const body = await req.text(); if (body.length > 4096) return json({ error: 'too big' }, 413);
@@ -42,7 +42,7 @@ export default {
   fetch(req, env, ctx) {
     const { pathname } = new URL(req.url);
     if (pathname.startsWith('/photos/')) return servePhoto(req, env, ctx, pathname.slice(8));
-    if (pathname.startsWith('/api/')) return env.HUB.get(env.HUB.idFromName('global')).fetch(req);
+    if (pathname.startsWith('/api/')) return env.HUB.get(env.HUB.idFromName('global-apac'), { locationHint: 'apac' }).fetch(req);
     if (pathname === '/india-states.json') return new Response(indiaJson, { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=86400' } });
     return pathname === '/style.css' ? file(css, 'text/css; charset=utf-8') : file(page, 'text/html; charset=utf-8'); // every other path is the app
   },

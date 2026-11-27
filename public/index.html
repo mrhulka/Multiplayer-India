@@ -31,7 +31,7 @@ const savedRounds = g => { try { return +localStorage['dpg-rounds-' + g] || 8; }
 
 // session survives a refresh: { name, room, token?, id?, secret? }
 const store = { get() { try { return JSON.parse(sessionStorage.dpg || '{}'); } catch { return {}; } }, set(v) { try { sessionStorage.dpg = JSON.stringify(v); } catch {} } };
-let me = store.get(), S, key, tick, es, guess, maps = [];
+let me = store.get(), S, key, tick, es, guess, maps = [], skew = 0; // skew = server clock - this device's clock
 const linkRoom = new URLSearchParams(location.search).get('room')?.toUpperCase();
 if (linkRoom && me.room !== linkRoom) me = { name: me.name };
 const save = () => store.set(me);
@@ -40,7 +40,7 @@ const isHost = () => !!me.token, isTv = () => isHost() && S?.play === 'tv', onli
 const tiles = name => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/${name}/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 16, attribution: 'Tiles © Esri' });
 // India's states (official boundaries), bundled with the game. Guessing map: states only, no base map, no labels.
 let statesP; const states = () => statesP ||= fetch('/india-states.json').then(r => r.json());
-const addStates = (m, fill) => states().then(S => S.forEach(rings => L.polygon(rings, { color: '#8E7FB8', weight: 1, fill, fillColor: '#FFF4E2', fillOpacity: 1, interactive: false }).addTo(m)));
+const addStates = (m, fill) => states().then(S => L.polygon(S.flat().map(ring => [ring]), { color: '#8E7FB8', weight: 1, fill, fillColor: '#FFF4E2', fillOpacity: 1, interactive: false, renderer: L.canvas() }).addTo(m)); // one canvas layer: far cheaper than 400 SVG paths
 const PIN_SVG = c => `<svg viewBox="0 0 24 32" width="30" height="40" aria-hidden="true"><path d="M12 31s10-11 10-19A10 10 0 0 0 2 12c0 8 10 19 10 19z" fill="${c}" stroke="#231A40" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#231A40"/></svg>`;
 const pinIcon = (c = '#F7A83E') => L.divIcon({ className: 'pin', html: PIN_SVG(c), iconSize: [30, 40], iconAnchor: [15, 39], tooltipAnchor: [0, -32] });
 const buzz = ms => navigator.vibrate?.(ms);
@@ -78,14 +78,14 @@ async function join(code) {
   me = { name: me.name, room: code, id: r.id, secret: r.secret }; save(); history.replaceState(null, '', '/?room=' + code); connect();
 }
 function connect() {
-  es?.close(); es = new EventSource('/api/events?room=' + me.room);
+  es?.close(); es = new EventSource('/api/events?room=' + me.room); states(); // fetch the India map now, not when the first map round starts
   es.onmessage = e => render(JSON.parse(e.data));
   es.onerror = () => { if (es.readyState === 2) { me = { name: me.name }; save(); history.replaceState(null, '', '/'); home('That room has ended. Start a new one?'); } };
 }
 
 // ---------- game screens ----------
 function render(s) {
-  S = s;
+  S = s; if (s.now) skew = s.now - Date.now(); // countdowns follow the server's clock, not this device's
   if (s.next) new Image().src = s.next; // preload the next question's photo during the results screen
   document.body.className = isTv() ? 'tv' : 'phone';
   const k = [s.phase, s.round, s.game].join();
@@ -143,7 +143,7 @@ function lobby(s) {
   }
 }
 
-const left = s => Math.max(0, (s.endsAt - Date.now()) / 1000);
+const left = s => Math.max(0, (s.endsAt - (Date.now() + skew)) / 1000);
 function timer(s) {
   const t = () => { const l = Math.ceil(left(s)); $('#t') && ($('#t').textContent = l); document.querySelector('.ring, .drain')?.classList.toggle('low', l <= 5); };
   t(); tick = setInterval(t, 250);
