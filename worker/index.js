@@ -27,10 +27,21 @@ export class Hub {
   }
 }
 
+// photos live in Workers KV; Cloudflare's edge cache keeps KV reads rare
+async function servePhoto(req, env, ctx, key) {
+  const cache = caches.default, hit = await cache.match(req);
+  if (hit) return hit;
+  const body = await env.PHOTOS.get(key, 'arrayBuffer');
+  if (!body) return new Response('no photo', { status: 404 });
+  const res = new Response(body, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable' } });
+  ctx.waitUntil(cache.put(req, res.clone()));
+  return res;
+}
 const file = (body, type) => new Response(body, { headers: { 'content-type': type, 'cache-control': 'no-cache' } });
 export default {
-  fetch(req, env) {
+  fetch(req, env, ctx) {
     const { pathname } = new URL(req.url);
+    if (pathname.startsWith('/photos/')) return servePhoto(req, env, ctx, pathname.slice(8));
     if (pathname.startsWith('/api/')) return env.HUB.get(env.HUB.idFromName('global')).fetch(req);
     if (pathname === '/india-states.json') return new Response(indiaJson, { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=86400' } });
     return pathname === '/style.css' ? file(css, 'text/css; charset=utf-8') : file(page, 'text/html; charset=utf-8'); // every other path is the app

@@ -6,6 +6,7 @@
   "preview_urls": false,
   "account_id": "a41578216d6ae44d98f5959b066bc713",
   "rules": [{ "type": "Text", "globs": ["**/*.html", "**/*.css"], "fallthrough": true }],
+  "kv_namespaces": [{ "binding": "PHOTOS", "id": "b98af5154d41433cb4f46378508a0277" }],
   "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "Hub" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Hub"] }]
 }

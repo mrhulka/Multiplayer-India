@@ -16,6 +16,11 @@ assert.deepStrictEqual(dup(Q.num.map(q => q[0])), []);
 for (const p of Q.map) assert(p.lat > 6 && p.lat < 37.5 && p.lng > 68 && p.lng < 97.5 && p.fact, 'bad place: ' + p.name);
 for (const q of Q.num) assert(Number.isFinite(q[1]) && typeof q[2] === 'string', 'bad question: ' + q[0]);
 
+// every place with a photo has its self-hosted file (photos/<slug>.jpg), so no photo depends on Wikimedia at game time
+const { slug } = require('./game');
+const missing = Q.map.filter(p => p.img && !fs.existsSync(`${__dirname}/photos/${slug(p.name)}.jpg`)).map(p => p.name);
+assert.deepStrictEqual(missing, [], 'photos missing: ' + missing.join(', '));
+
 // no repeats until the whole bank has been dealt, then it cycles
 for (const [game, key] of [['map', q => q.name], ['num', q => q[0]]]) {
   const asked = new Set(), games = Math.floor(Q[game].length / ROUNDS);

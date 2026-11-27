@@ -79,6 +79,7 @@ function connect() {
 // ---------- game screens ----------
 function render(s) {
   S = s;
+  if (s.next) new Image().src = s.next; // preload the next question's photo during the results screen
   document.body.className = isTv() ? 'tv' : 'phone';
   const k = [s.phase, s.round, s.game].join();
   if (k !== key) { key = k; guess = null; clearInterval(tick); maps.forEach(m => m.remove()); maps = []; draw(s); }
