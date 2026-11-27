@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#231A40">
 <title>Desi Party Games</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap">
@@ -34,6 +34,10 @@ const tiles = name => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/s
 // India's states (official boundaries), bundled with the game. Guessing map: states only, no base map, no labels.
 let statesP; const states = () => statesP ||= fetch('/india-states.json').then(r => r.json());
 const addStates = (m, fill) => states().then(S => S.forEach(rings => L.polygon(rings, { color: '#8E7FB8', weight: 1, fill, fillColor: '#FFF4E2', fillOpacity: 1, interactive: false }).addTo(m)));
+const PIN_SVG = c => `<svg viewBox="0 0 24 32" width="30" height="40" aria-hidden="true"><path d="M12 31s10-11 10-19A10 10 0 0 0 2 12c0 8 10 19 10 19z" fill="${c}" stroke="#231A40" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#231A40"/></svg>`;
+const pinIcon = (c = '#F7A83E') => L.divIcon({ className: 'pin', html: PIN_SVG(c), iconSize: [30, 40], iconAnchor: [15, 39], tooltipAnchor: [0, -32] });
+const buzz = ms => navigator.vibrate?.(ms);
+const INDIA = [[6.5, 68.1], [35.6, 97.4]];
 const joinUrl = code => `${location.origin}/?room=${code}`;
 
 // ---------- entry: name first, then create or join ----------
@@ -99,6 +103,7 @@ const gameCards = () => `<div class="games">${Object.entries(GAMES).map(([g, x],
 const pills = (cls = '') => `<div class="chips ${cls}" id="pills"></div>`;
 
 function draw(s) {
+  app.classList.toggle('fit', !isTv() && s.phase === 'question'); // phone question = exactly one screen, no scrolling
   ({ lobby, question, reveal, final })[s.phase](s);
   $('#lobby') && ($('#lobby').onclick = () => post('lobby', { room: me.room, token: me.token }));
   document.querySelectorAll('[data-game]').forEach(b => b.onclick = () => b.getAttribute('aria-disabled') !== 'true' && post('start', { room: me.room, token: me.token, game: b.dataset.game }));
@@ -141,7 +146,8 @@ function promptBlock(s) {
   const q = s.photoOnly ? 'Where is this?' : `Where is ${esc(s.prompt)}?`;
   return s.img ? `<div class="photo"><img src="${esc(s.img)}" alt=""><h2>${q}</h2></div>` : `<div class="card prompt rise"><h2>${q}</h2></div>`;
 }
-const photoFallback = s => { const im = $('.photo img'); if (im) im.onerror = () => { im.remove(); $('.photo h2').textContent = `Where is ${s.prompt}?`; }; };
+// photo failed to load: turn the photo box into a plain question card (and name the place on photo-only rounds)
+const photoFallback = s => { const im = $('.photo img'); if (im) im.onerror = () => { const ph = $('.photo'); im.remove(); ph.className = 'card prompt'; ph.querySelector('h2').textContent = `Where is ${s.prompt}?`; }; };
 
 function question(s) {
   if (isTv()) {
@@ -152,24 +158,25 @@ function question(s) {
   }
   // phone: online players also need the prompt, same-room players look at the host screen
   const ask = online() ? promptBlock(s) : `<h1 class="rise" style="font-size:28px">${s.game === 'num' ? esc(s.prompt) : s.photoOnly ? 'Where’s the place on the host screen?' : `Where is ${esc(s.prompt)}?`}</h1>`;
-  const top = `${lobbyBtn()}<div class="drain"><i style="${anim(s)}"></i></div><div class="row"><span class="label">Round ${s.round} of ${s.total} · ${howTo(s)}</span><b id="t" aria-label="seconds left"></b></div>${ask}`;
+  const short = s.game === 'num' ? 'Andaaza' : s.mode === 'circle' ? 'Circle round' : 'Pin round';
+  const top = `<div class="qbar"><span class="label">Round ${s.round}/${s.total} · ${short}</span><span style="display:flex;gap:8px;align-items:center;flex-shrink:0">${isHost() ? '<button class="small ghost" id="lobby">Lobby</button>' : ''}<b id="t" class="secs" aria-label="seconds left"></b></span></div><div class="drain"><i style="${anim(s)}"></i></div>${ask}`;
   if (s.game === 'num') {
-    html(`${top}<form id="f" class="stack rise" style="--d:.1s"><input id="g" type="number" inputmode="decimal" step="any" placeholder="Your andaaza${s.unit ? ' (' + esc(s.unit) + ')' : ''}" aria-label="Your answer" required><button>Lock it in</button></form>`);
+    html(`${top}<form id="f" class="stack rise" style="--d:.1s"><input id="g" type="number" inputmode="decimal" enterkeyhint="done" step="any" placeholder="Your andaaza${s.unit ? ' (' + esc(s.unit) + ')' : ''}" aria-label="Your answer" required><button>Lock it in</button></form>`);
     $('#g').focus();
     $('#f').onsubmit = e => { e.preventDefault(); guess = +$('#g').value; submit(); };
   } else {
     const circle = s.mode === 'circle';
-    html(`${top}<div id="m" class="map ${online() ? 'small' : ''} rise" style="--d:.08s"></div>
-      ${circle ? `<div class="card slider"><label for="r" class="row"><span>Circle size · <span id="rl">300</span> km</span><span class="accent" id="rp">up to 700 pts</span></label><input id="r" type="range" min="25" max="1000" step="25" value="300"><div class="row muted" style="font-size:13px"><span>Risky · more points</span><span>Safe · fewer points</span></div></div>` : ''}
+    html(`${top}<div id="m" class="map rise" style="--d:.08s"></div>
+      ${circle ? `<div class="card slider"><label for="r" class="row"><span>Circle · <span id="rl">300</span> km</span><span class="accent" id="rp">up to 700 pts</span></label><input id="r" type="range" min="25" max="1000" step="25" value="300"></div>` : ''}
       <button id="s" disabled>${circle ? 'Tap the map, then lock it in' : 'Tap the map to drop your pin'}</button>`);
     photoFallback(s);
-    const m = L.map('m', { zoomControl: false, attributionControl: true }).setView([22.5, 80], 4); maps.push(m);
+    const m = L.map('m', { zoomControl: false, attributionControl: true, zoomSnap: .25 }).fitBounds(INDIA, { padding: [6, 6] }); maps.push(m);
     addStates(m, true); m.attributionControl.addAttribution('Boundaries: india-maps-data');
     let pin, ring;
     const upd = () => { if (!pin) return; guess = { ...pin.getLatLng(), radius: circle ? +$('#r').value : undefined };
       if (circle) { ring ? ring.setLatLng(guess).setRadius(guess.radius * 1000) : (ring = L.circle(guess, { radius: guess.radius * 1000, color: '#F7A83E', weight: 3, fillOpacity: .2 }).addTo(m)); }
       $('#s').disabled = false; $('#s').textContent = 'Lock it in'; };
-    m.on('click', e => { pin ? pin.setLatLng(e.latlng) : (pin = L.marker(e.latlng).addTo(m)); upd(); });
+    m.on('click', e => { pin ? pin.setLatLng(e.latlng) : (pin = L.marker(e.latlng, { icon: pinIcon() }).addTo(m)); buzz(15); upd(); });
     if (circle) $('#r').oninput = () => { const v = +$('#r').value; $('#rl').textContent = v; $('#rp').textContent = `up to ${Math.max(100, 1000 - v)} pts`; upd(); };
     $('#s').onclick = submit;
   }
@@ -179,7 +186,7 @@ async function submit() {
   if (guess == null || Number.isNaN(guess)) return;
   const k = key, r = await post('answer', { room: me.room, id: me.id, secret: me.secret, guess });
   if (r.error || key !== k) return; // the reveal can arrive before our own reply: don't cover it
-  clearInterval(tick); maps.forEach(m => m.remove()); maps = [];
+  clearInterval(tick); maps.forEach(m => m.remove()); maps = []; buzz(40); app.classList.remove('fit');
   html(`${lobbyBtn()}<div class="locked"><div class="check">${CHECK}</div><h1 class="hero">Locked in!</h1>
     <p class="muted">${online() ? 'Waiting for the others…' : 'Eyes on the host screen.'}</p></div>${online() ? `<div class="row"><span class="label">Answered</span><span class="muted" id="count"></span></div>${pills()}` : ''}`);
   syncChips($('#pills'), S.players, true);
@@ -209,7 +216,7 @@ function reveal(s) {
     tiles('World_Street_Map').addTo(m); addStates(m, false);
     L.circleMarker(pts[0], { radius: 12, color: '#34C6B3', fillColor: '#34C6B3', fillOpacity: 1 }).addTo(m).bindTooltip(esc(r.name), { permanent: true });
     r.results.forEach(x => { const p = [x.guess.lat, x.guess.lng]; pts.push(p);
-      L.marker(p).addTo(m).bindTooltip(esc(x.name), { permanent: true }); L.polyline([pts[0], p], { color: '#F7A83E', dashArray: '6', weight: 3 }).addTo(m);
+      L.marker(p, { icon: pinIcon(x.points ? '#F7A83E' : '#FF8A7A') }).addTo(m).bindTooltip(esc(x.name), { permanent: true, direction: 'top' }); L.polyline([pts[0], p], { color: '#F7A83E', dashArray: '6', weight: 3 }).addTo(m);
       if (x.guess.radius) L.circle(p, { radius: x.guess.radius * 1000, color: x.points ? '#34C6B3' : '#FF8A7A' }).addTo(m); });
     m.fitBounds(pts, { padding: [40, 40], maxZoom: 7 });
   }
