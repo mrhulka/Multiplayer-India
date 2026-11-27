@@ -9,14 +9,17 @@ assert.strictEqual(circlePoints(40, 50), 950);   // inside a small circle
 assert.strictEqual(circlePoints(40, 950), 100);  // inside a huge circle: floor
 assert.strictEqual(circlePoints(60, 50), 0);     // missed
 
-// Pehchaan Kaun: right + instant = 1000, right at the buzzer = 500, wrong = 0; four distinct same-gender options incl. the answer
-const { facePoints, faceOptions } = require('./game');
-assert.strictEqual(facePoints(true, 0, 15000), 1000);
-assert.strictEqual(facePoints(true, 15000, 15000), 500);
-assert.strictEqual(facePoints(true, 7500, 15000), 750);
-assert.strictEqual(facePoints(false, 100, 15000), 0);
-for (const q of Q.face) { const o = faceOptions(q); assert(o.length === 4 && new Set(o).size === 4 && o.includes(q.name), 'options for ' + q.name);
-  assert(o.every(n => Q.face.find(f => f.name === n).gender === q.gender), 'gender mix for ' + q.name); }
+// Pehchaan Kaun spelling: exact (ignoring case/spaces/punctuation) = 1000, small slips score less, way off = 0
+const { spellPoints } = require('./game'), sp = (t, a) => spellPoints(t, a).points;
+assert.strictEqual(sp('Shah Rukh Khan', ['Shah Rukh Khan']), 1000);
+assert.strictEqual(sp('shahrukh khan', ['Shah Rukh Khan']), 1000);
+assert.strictEqual(sp('A R Rahman', ['A. R. Rahman']), 1000);
+const one = sp('Amitabh Bachan', ['Amitabh Bachchan']), two = sp('Amitab Bachan', ['Amitabh Bachchan']);
+assert(one < 1000 && one > two && two > 0, `one slip ${one} > two slips ${two} > 0`);
+assert.strictEqual(sp('Salman Khan', ['Shah Rukh Khan']), 0);
+assert.strictEqual(sp('', ['Kajol']), 0);
+assert.strictEqual(sp('Kareena Kapoor', ['Kareena Kapoor Khan', 'Kareena Kapoor']), 1000); // accepted alternate
+for (const q of Q.face) assert(q[0] && q[1] && (!q[2] || Array.isArray(q[2])), 'bad clue ' + q[0]);
 
 // question bank sanity
 const dup = a => a.filter((x, i) => a.indexOf(x) !== i);
@@ -27,11 +30,11 @@ for (const q of Q.num) assert(Number.isFinite(q[1]) && typeof q[2] === 'string',
 
 // every place with a photo has its self-hosted file (photos/<slug>.jpg), so no photo depends on Wikimedia at game time
 const { slug } = require('./game');
-const missing = [...Q.map, ...Q.face].filter(p => p.img && !fs.existsSync(`${__dirname}/photos/${slug(p.name)}.jpg`)).map(p => p.name);
+const missing = Q.map.filter(p => p.img && !fs.existsSync(`${__dirname}/photos/${slug(p.name)}.jpg`)).map(p => p.name);
 assert.deepStrictEqual(missing, [], 'photos missing: ' + missing.join(', '));
 
 // no repeats until the whole bank has been dealt, then it cycles
-for (const [game, key] of [['map', q => q.name], ['num', q => q[0]], ['face', q => q.name]]) {
+for (const [game, key] of [['map', q => q.name], ['num', q => q[0]], ['face', q => q[0]]]) {
   const asked = new Set(), games = Math.floor(Q[game].length / ROUNDS);
   for (let g = 0; g < games; g++) for (const q of deal(game)) { assert(!asked.has(key(q)), 'repeat: ' + key(q)); asked.add(key(q)); markSeen(game, q); }
   assert.strictEqual(deal(game).length, ROUNDS); // exhausted → fresh cycle

@@ -20,7 +20,9 @@ Refreshing the page puts you back into your game.
   After each round the host screen shows every pin, the real spot and a fact about the place.
 - **Andaaza Apna Apna**: guess the number (cricket, history, ISRO, Bollywood…). The reveal shows every guess on a number line. Closest gets 1000, farthest gets 100, and an exact guess gets +200 on top.
 
-Each game has 8 rounds of 25 s. The host can go **Back to lobby** at any time and start the other game with the same players.
+- **Pehchaan Kaun**: the host screen shows a clue about a Bollywood star (113 actors, legends, singers and directors). Players type the name. Exact spelling (ignoring capitals, spaces and punctuation) scores 1000; misspellings score less the more letters are wrong, down to 0 at half wrong.
+
+The host picks the number of rounds (3–20) for each game in the lobby. Timing: AtaaPataa 25 s to answer and 10 s of results; Andaaza Apna Apna 25 s and the next question 3 s after the reveal; Pehchaan Kaun 25 s and 6 s. The host can go **Back to lobby** at any time and start the other game with the same players.
 **Question bank:** `questions.js` has 310 places, with coordinates checked against Wikipedia and 263 hand-reviewed photos (78 of them photo-only rounds), (enough for 38 games) and 431 Andaaza Apna Apna questions (enough for 53 games). Questions never repeat until the whole bank has been used. The server records every question it asks in `seen.json`, and that record survives restarts. Delete `seen.json` to start over. No dependencies. `npm test` checks the scoring.
 
 ## Cloudflare

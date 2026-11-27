@@ -112,7 +112,6 @@ select { font: 800 18px Nunito, sans-serif; background: var(--raised); color: va
 .drain.low i { background: var(--guava); }
 .ask { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 26px; flex-grow: 1; min-height: 480px; }
 .photo { position: relative; border-radius: 28px; overflow: hidden; background: var(--card); min-height: 320px; animation: zoomIn .35s var(--ease) both; }
-.photo.face img { object-position: 50% 22%; }
 .photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .photo h2 { position: absolute; left: 20px; bottom: 20px; right: 20px; width: fit-content; background: var(--bg); border-radius: 18px; padding: 12px 22px; font-size: 44px; }
 .prompt { display: grid; place-items: center; text-align: center; }
@@ -194,17 +193,7 @@ body.phone .fact img { width: 80px; height: 64px; }
   .photo h2 { font-size: 28px; }
 }
 
-/* Pehchaan Kaun: four name tiles (host shows them, phones tap them) */
-.opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.opt { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; background: var(--card); font: 800 22px/1.15 Nunito, sans-serif; color: var(--cream); text-align: left; box-shadow: none; }
-.opt b { flex-shrink: 0; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font: 800 22px 'Baloo 2', sans-serif; color: var(--bg); }
-.o0 b { background: var(--gold); } .o1 b { background: var(--teal); } .o2 b { background: var(--guava); } .o3 b { background: var(--muted); }
-.opt span { display: flex; flex-direction: column; } .opt small { font-size: 14px; color: var(--muted); font-weight: 700; }
-.opts.pick { flex: 1 1 auto; grid-template-columns: minmax(0, 1fr); align-content: stretch; }
-.opts.pick .opt { font-size: 20px; min-height: 56px; }
-.opts.pick .opt:active, .opt.chosen { background: var(--raised); transform: scale(.98); }
-.opt.right { background: var(--teal); color: var(--teal-ink); } .opt.right small { color: var(--teal-ink); } .opt.right b { background: var(--teal-ink); color: var(--teal); }
-.opt.wrong { opacity: .55; }
-.face-head { display: flex; align-items: center; justify-content: center; gap: 22px; }
-.face-head img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; object-position: 50% 22%; border: 4px solid var(--teal); }
-body.phone .face-head img { width: 84px; height: 84px; } body.phone .face-head h1 { font-size: 34px; }
+/* Pehchaan Kaun: the clue */
+.clue { gap: 10px; align-content: center; }
+.clue h2 { font-size: 40px; line-height: 1.2; }
+body.phone .clue h2, #app.fit .clue h2 { font-size: 20px !important; }
