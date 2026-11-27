@@ -1,4 +1,4 @@
-# Desi Party Games
+# Lock It
 
 Map Grab and Ball Park with Indian questions. The host screen (a laptop, TV or tablet) shows a QR code, and players join and play on their phones.
 

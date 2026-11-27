@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#231A40">
-<title>Desi Party Games</title>
+<title>Lock It</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -58,7 +58,7 @@ function nameScreen() {
 }
 function home(msg = '') {
   document.body.className = 'phone';
-  html(`<div class="row rise"><span class="logo">Desi <span class="accent">Party</span> Games</span><button class="small ghost" id="rename">${esc(me.name)} · change</button></div>
+  html(`<div class="row rise"><span class="logo">Lock <span class="accent">It</span></span><button class="small ghost" id="rename">${esc(me.name)} · change</button></div>
     ${msg ? `<p class="card center rise">${esc(msg)}</p>` : ''}
     <h1 class="rise" style="--d:.05s">Start a game</h1>
     <button class="choice rise" style="--d:.1s" data-play="tv"><span class="icon">${TV}</span><span><b>Same room</b><br><span class="muted">Put this screen where everyone can see it: a laptop, TV or tablet. Everyone scans a QR code with their phone.</span></span></button>
@@ -123,19 +123,19 @@ function draw(s) {
 function lobby(s) {
   if (isTv()) {
     html(`<div class="lobby"><div class="card stack rise" style="align-items:center;text-align:center">
-        <span class="logo">Desi <span class="accent">Party</span> Games</span><div class="qr" id="qr"></div>
+        <span class="logo">Lock <span class="accent">It</span></span><div class="qr" id="qr"></div>
         <p class="muted">Scan to join, or open <b style="color:var(--cream)">${esc(location.host)}</b> and enter</p>
         <div class="tiles">${[...s.code].map((ch, i) => `<span class="pop" style="--d:${.1 + i * .08}s">${ch}</span>`).join('')}</div></div>
       <div class="stack"><div class="row rise" style="--d:.1s"><h2 style="font-size:36px">Who’s playing</h2><span class="muted" id="count"></span></div>${pills()}${gameCards()}</div></div>`);
     new QRCode($('#qr'), { text: joinUrl(s.code), width: 212, height: 212, colorDark: '#231A40', colorLight: '#FFF4E2' });
   } else if (isHost()) { // online host
-    html(`<div class="row rise"><span class="logo">Desi <span class="accent">Party</span> Games</span><span class="pill">Room ${s.code}</span></div>
+    html(`<div class="row rise"><span class="logo">Lock <span class="accent">It</span></span><span class="pill">Room ${s.code}</span></div>
       <div class="card stack rise" style="--d:.05s"><h2>Invite your friends</h2><p class="muted">Send them this link. They can join from anywhere.</p>
         <div class="share"><input id="link" readonly value="${esc(joinUrl(s.code))}" aria-label="Invite link"><button class="small" id="copy">Copy</button></div>
         ${navigator.share ? '<button class="ghost" id="shareBtn">Share invite</button>' : ''}</div>
       <div class="row rise" style="--d:.1s"><h2>Who’s playing</h2><span class="muted" id="count"></span></div>${pills()}${gameCards()}`);
     $('#copy').onclick = () => { $('#link').select(); navigator.clipboard?.writeText(joinUrl(s.code)); $('#copy').textContent = 'Copied!'; };
-    $('#shareBtn') && ($('#shareBtn').onclick = () => navigator.share({ title: 'Desi Party Games', text: `${me.name} invited you to play! Room ${s.code}`, url: joinUrl(s.code) }));
+    $('#shareBtn') && ($('#shareBtn').onclick = () => navigator.share({ title: 'Lock It', text: `${me.name} invited you to play! Room ${s.code}`, url: joinUrl(s.code) }));
   } else {
     html(`<div class="stack rise" style="margin-top:6vh;align-items:center;text-align:center"><div class="check">${CHECK}</div>
       <h1 class="hero">You’re in, ${esc(mine()?.name || me.name)}!</h1><p class="muted">Waiting for ${esc(s.host || 'the host')} to pick a game…</p></div>
