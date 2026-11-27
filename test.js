@@ -9,6 +9,15 @@ assert.strictEqual(circlePoints(40, 50), 950);   // inside a small circle
 assert.strictEqual(circlePoints(40, 950), 100);  // inside a huge circle: floor
 assert.strictEqual(circlePoints(60, 50), 0);     // missed
 
+// Pehchaan Kaun: right + instant = 1000, right at the buzzer = 500, wrong = 0; four distinct same-gender options incl. the answer
+const { facePoints, faceOptions } = require('./game');
+assert.strictEqual(facePoints(true, 0, 15000), 1000);
+assert.strictEqual(facePoints(true, 15000, 15000), 500);
+assert.strictEqual(facePoints(true, 7500, 15000), 750);
+assert.strictEqual(facePoints(false, 100, 15000), 0);
+for (const q of Q.face) { const o = faceOptions(q); assert(o.length === 4 && new Set(o).size === 4 && o.includes(q.name), 'options for ' + q.name);
+  assert(o.every(n => Q.face.find(f => f.name === n).gender === q.gender), 'gender mix for ' + q.name); }
+
 // question bank sanity
 const dup = a => a.filter((x, i) => a.indexOf(x) !== i);
 assert.deepStrictEqual(dup(Q.map.map(p => p.name)), []);
@@ -18,13 +27,13 @@ for (const q of Q.num) assert(Number.isFinite(q[1]) && typeof q[2] === 'string',
 
 // every place with a photo has its self-hosted file (photos/<slug>.jpg), so no photo depends on Wikimedia at game time
 const { slug } = require('./game');
-const missing = Q.map.filter(p => p.img && !fs.existsSync(`${__dirname}/photos/${slug(p.name)}.jpg`)).map(p => p.name);
+const missing = [...Q.map, ...Q.face].filter(p => p.img && !fs.existsSync(`${__dirname}/photos/${slug(p.name)}.jpg`)).map(p => p.name);
 assert.deepStrictEqual(missing, [], 'photos missing: ' + missing.join(', '));
 
 // no repeats until the whole bank has been dealt, then it cycles
-for (const [game, key] of [['map', q => q.name], ['num', q => q[0]]]) {
+for (const [game, key] of [['map', q => q.name], ['num', q => q[0]], ['face', q => q.name]]) {
   const asked = new Set(), games = Math.floor(Q[game].length / ROUNDS);
   for (let g = 0; g < games; g++) for (const q of deal(game)) { assert(!asked.has(key(q)), 'repeat: ' + key(q)); asked.add(key(q)); markSeen(game, q); }
   assert.strictEqual(deal(game).length, ROUNDS); // exhausted → fresh cycle
 }
-console.log(`ok · ${Q.map.length} places (${Math.floor(Q.map.length / ROUNDS)} games) · ${Q.num.length} Andaaza (${Math.floor(Q.num.length / ROUNDS)} games) with no repeats`);
+console.log(`ok · ${Q.map.length} places · ${Q.num.length} Andaaza · ${Q.face.length} celebrities (at 8 rounds: ${[Q.map, Q.num, Q.face].map(b => Math.floor(b.length / ROUNDS)).join(' / ')} games with no repeats)`);
