@@ -1,7 +1,10 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#231A40">
-<title>Lock It</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0E0A24">
+<title>Lock It · game night with your friends, wherever they are</title>
+<meta name="description" content="Multiplayer game night with your friends, wherever they are. Same room or different cities, everyone plays on their phone. No app needed.">
+<meta property="og:title" content="Lock It · game night with your friends, wherever they are"><meta property="og:description" content="AtaaPataa, Andaaza Apna Apna, Pehchaan Kaun and Dimaag Ka Dahi. Open on a laptop or TV, play on your phones. No app needed.">
+<meta property="og:image" content="https://inmyopinion.in/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800;900&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -10,7 +13,14 @@
 const $ = q => document.querySelector(q), app = $('#app');
 const html = h => { app.innerHTML = h; scrollTo(0, 0); };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
-const post = (p, b) => fetch('/api/' + p, { method: 'POST', body: JSON.stringify(b) }).then(r => r.json());
+// API call with retries on network trouble; always resolves ({ error: 'offline' } when it gives up)
+async function post(p, b, tries = 3) {
+  for (let i = 0; ; i++) {
+    try { return await (await fetch('/api/' + p, { method: 'POST', body: JSON.stringify(b) })).json(); }
+    catch { if (i >= tries - 1) return { error: 'offline' }; await new Promise(z => setTimeout(z, 400 * (i + 1))); }
+  }
+}
+const toast = msg => { $('.toast')?.remove(); const t = Object.assign(document.createElement('div'), { className: 'toast', role: 'status', textContent: msg }); document.body.append(t); setTimeout(() => t.remove(), 3200); };
 const fmt = n => Math.abs(n) >= 10000 ? n.toLocaleString('en-IN') : String(n);
 const ico = d => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const PIN = ico('<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>');
@@ -18,6 +28,8 @@ const BARS = ico('<path d="M3 17h18M6 17v-3M12 17V9M18 17v-6"/>');
 const TV = ico('<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/>');
 const GLOBE = ico('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>');
 const PHONE = ico('<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>');
+const LOCK = '<svg class="lockmark" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.6"/></svg>';
+const LOGO = `<span class="logo">${LOCK}Lock <span class="accent">It</span></span>`;
 const CHECK = ico('<path d="M5 12.5l4.5 4.5L19 7.5"/>');
 const BRAIN = ico('<path d="M9 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a2 2 0 0 0-3-2z"/><path d="M15 3a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>');
 const FACE = ico('<path d="M4 6h16v10H8l-4 4z"/><path d="M10 9.5a2 2 0 1 1 2.5 1.9c-.3.1-.5.4-.5.7V13M12 14.8v.2"/>');
@@ -29,11 +41,13 @@ const LETTERS = 'ABCD';
 const ROUND_OPTS = [3, 5, 8, 10, 15, 20];
 const savedRounds = g => { try { return +localStorage['dpg-rounds-' + g] || 8; } catch { return 8; } };
 
-// session survives a refresh: { name, room, token?, id?, secret? }
-const store = { get() { try { return JSON.parse(sessionStorage.dpg || '{}'); } catch { return {}; } }, set(v) { try { sessionStorage.dpg = JSON.stringify(v); } catch {} } };
-let me = store.get(), S, key, tick, es, guess, maps = [], skew = 0; // skew = server clock - this device's clock
+// remembered on this device between visits: { name, device, room?, token?, id?, secret? }
+const store = { get() { try { return JSON.parse(localStorage.lockit || sessionStorage.dpg || '{}'); } catch { return {}; } }, set(v) { try { localStorage.lockit = JSON.stringify(v); } catch {} } };
+let me = store.get(), S, key, tick, es, guess, maps = [], skew = 0, lastSeen = 0; // skew = server clock - this device's clock
+me.device ||= crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now(); // lets a rejoin find your seat again
+const fresh = () => ({ name: me.name, device: me.device });
 const linkRoom = new URLSearchParams(location.search).get('room')?.toUpperCase();
-if (linkRoom && me.room !== linkRoom) me = { name: me.name };
+if (linkRoom && me.room !== linkRoom) me = fresh();
 const save = () => store.set(me);
 const isHost = () => !!me.token, isTv = () => isHost() && S?.play === 'tv', online = () => S?.play === 'online';
 // Esri basemaps: free, no API key. ponytail: switch to a keyed provider if usage outgrows Esri's free terms
@@ -42,46 +56,53 @@ const tiles = name => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/s
 let statesP; const states = () => statesP ||= fetch('/india-states.json').then(r => r.json());
 const addStates = (m, fill) => states().then(S => L.polygon(S.flat().map(ring => [ring]), { color: '#8E7FB8', weight: 1, fill, fillColor: '#FFF4E2', fillOpacity: 1, interactive: false, renderer: L.canvas() }).addTo(m)); // one canvas layer: far cheaper than 400 SVG paths
 const PIN_SVG = c => `<svg viewBox="0 0 24 32" width="30" height="40" aria-hidden="true"><path d="M12 31s10-11 10-19A10 10 0 0 0 2 12c0 8 10 19 10 19z" fill="${c}" stroke="#231A40" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#231A40"/></svg>`;
-const pinIcon = (c = '#F7A83E') => L.divIcon({ className: 'pin', html: PIN_SVG(c), iconSize: [30, 40], iconAnchor: [15, 39], tooltipAnchor: [0, -32] });
+const pinIcon = (c = '#FFB547') => L.divIcon({ className: 'pin', html: PIN_SVG(c), iconSize: [30, 40], iconAnchor: [15, 39], tooltipAnchor: [0, -32] });
 const buzz = ms => navigator.vibrate?.(ms);
 const INDIA = [[6.5, 68.1], [35.6, 97.4]];
 const joinUrl = code => `${location.origin}/?room=${code}`;
 
 // ---------- entry: name first, then create or join ----------
 function nameScreen() {
-  html(`<div class="stack rise" style="margin-top:8vh;align-items:center;text-align:center">
-    <span class="icon wobble">${PHONE}</span><h1 class="hero">Aa jao!</h1><p class="muted">First things first. What should we call you?</p></div>
+  html(`<div class="stack rise hello">${LOGO}<p class="tagline">Game night with your friends, wherever they are.</p><h1 class="hero">Aa jao!</h1><p class="muted">First things first. What should we call you?</p></div>
     <form id="f" class="card stack rise" style="--d:.1s"><label>Your name<input id="n" maxlength="16" autocomplete="nickname" value="${esc(me.name)}" required></label>
     <button>Let’s go</button></form>`);
-  $('#n').focus();
+  if (!coarse()) $('#n').focus();
   $('#f').onsubmit = e => { e.preventDefault(); me.name = $('#n').value.trim(); if (!me.name) return; save(); linkRoom ? join(linkRoom) : home(); };
 }
 function home(msg = '') {
   document.body.className = 'phone';
-  html(`<div class="row rise"><span class="logo">Lock <span class="accent">It</span></span><button class="small ghost" id="rename">${esc(me.name)} · change</button></div>
+  html(`<div class="row rise">${LOGO}<button class="small ghost" id="rename">${esc(me.name)} · change</button></div>
     ${msg ? `<p class="card center rise">${esc(msg)}</p>` : ''}
-    <h1 class="rise" style="--d:.05s">Start a game</h1>
+    <h1 class="rise" style="--d:.05s">Hey ${esc(me.name)}, start a game</h1>
     <button class="choice rise" style="--d:.1s" data-play="tv"><span class="icon">${TV}</span><span><b>Same room</b><br><span class="muted">Put this screen where everyone can see it: a laptop, TV or tablet. Everyone scans a QR code with their phone.</span></span></button>
     <button class="choice rise" style="--d:.16s" data-play="online"><span class="icon teal">${GLOBE}</span><span><b>Play online</b><br><span class="muted">Get a link to share. Everyone plays on their own device, wherever they are.</span></span></button>
-    <form id="j" class="card stack rise" style="--d:.22s"><label>Got a room code?<input id="c" class="code" maxlength="4" autocomplete="off" required></label><button class="ghost">Join</button><p id="err" class="center accent" role="alert"></p></form>`);
+    <form id="j" class="card stack rise" style="--d:.22s"><label>Got a room code?<input id="c" class="code" maxlength="4" autocomplete="off" required></label><button class="ghost">Join</button><p id="err" class="center accent" role="alert"></p></form>
+    <div class="card stack rise" style="--d:.28s"><span class="label">Tell your friends about Lock It</span>${shareBar(location.origin, 'Game night with your friends, wherever they are. Play Lock It:')}</div>`);
   $('#rename').onclick = nameScreen;
   document.querySelectorAll('[data-play]').forEach(b => b.onclick = () => create(b.dataset.play));
   $('#j').onsubmit = e => { e.preventDefault(); join($('#c').value.trim().toUpperCase()); };
 }
 async function create(play) {
-  const r = await post('room', { play, name: me.name });
-  me = { name: me.name, room: r.code, token: r.token, id: r.id, secret: r.secret }; save(); connect();
+  const r = await post('room', { play, name: me.name, device: me.device });
+  if (r.error) return toast('Couldn’t start a room. Check your connection and try again.');
+  me = { ...fresh(), room: r.code, token: r.token, id: r.id, secret: r.secret }; save(); connect();
 }
 async function join(code) {
-  const r = await post('join', { room: code, name: me.name });
-  if (r.error) { const err = r.error === 'no room' ? `Couldn’t find room ${code}. Check the code?` : r.error; return $('#err') ? $('#err').textContent = err : home(err); }
-  me = { name: me.name, room: code, id: r.id, secret: r.secret }; save(); history.replaceState(null, '', '/?room=' + code); connect();
+  const r = await post('join', { room: code, name: me.name, device: me.device });
+  if (r.error) { const err = r.error === 'no room' ? `Couldn’t find room ${code}. Check the code?` : r.error === 'offline' ? 'No connection. Try again.' : r.error; return $('#err') ? $('#err').textContent = err : home(err); }
+  me = { ...fresh(), room: code, id: r.id, secret: r.secret }; save(); history.replaceState(null, '', '/?room=' + code); connect();
 }
-function connect() {
-  es?.close(); es = new EventSource('/api/events?room=' + me.room); states(); // fetch the India map now, not when the first map round starts
-  es.onmessage = e => render(JSON.parse(e.data));
-  es.onerror = () => { if (es.readyState === 2) { me = { name: me.name }; save(); history.replaceState(null, '', '/'); home('That room has ended. Start a new one?'); } };
+function connect(quiet) {
+  es?.close(); es = new EventSource(`/api/events?room=${me.room}${me.id ? '&id=' + me.id : ''}`); states(); // fetch the India map now, not when the first map round starts
+  lastSeen = Date.now();
+  es.onmessage = e => { lastSeen = Date.now(); render(JSON.parse(e.data)); };
+  es.addEventListener('ping', () => lastSeen = Date.now());
+  es.onerror = () => { if (es.readyState === 2) { const was = S; me = fresh(); save(); es = null; history.replaceState(null, '', '/'); home(quiet && !was ? '' : 'That room has ended. Start a new one?'); } };
 }
+// a phone that slept or switched apps can hold a dead connection without noticing: reconnect when the heartbeat stops
+setInterval(() => { if (es && Date.now() - lastSeen > 25000) connect(); }, 5000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && es && Date.now() - lastSeen > 4000) connect(); });
+const coarse = () => matchMedia('(pointer: coarse)').matches; // touch screens: don't pop the keyboard up uninvited
 
 // ---------- game screens ----------
 function render(s) {
@@ -107,12 +128,25 @@ function syncChips(el, players, showDone) {
 }
 const mine = () => S.players.find(p => p.id === me.id);
 const lobbyBtn = () => isHost() ? '<button class="small ghost corner" id="lobby">Back to lobby</button>' : '';
-const gameCards = () => `<div class="games">${Object.entries(GAMES).map(([g, x], i) => `<div class="game rise" style="--d:${.1 + i * .06}s"><span class="icon ${x.tone}">${x.icon}</span><h2>${x.name}</h2><span class="muted">${x.blurb}</span>
+const gameCards = () => `<div class="games">${Object.entries(GAMES).map(([g, x], i) => `<div class="game g-${g} rise" style="--d:${.1 + i * .06}s"><span class="icon ${x.tone}">${x.icon}</span><h2>${x.name}</h2><span class="muted">${x.blurb}</span>
   <div class="go-row"><label class="rounds">Rounds<select data-rounds="${g}">${ROUND_OPTS.map(n => `<option${n === savedRounds(g) ? ' selected' : ''}>${n}</option>`).join('')}</select></label><button class="go" data-game="${g}" ${S.players.length ? '' : 'disabled'}>Start</button></div></div>`).join('')}</div>`;
 const pills = (cls = '') => `<div class="chips ${cls}" id="pills"></div>`;
+// share to any platform: links for the big ones, the phone's own share sheet for everything else, and copy
+function shareBar(url, text) {
+  const u = encodeURIComponent(url), t = encodeURIComponent(text), both = encodeURIComponent(`${text} ${url}`);
+  const links = [['wa', 'WhatsApp', `https://wa.me/?text=${both}`], ['tg', 'Telegram', `https://t.me/share/url?url=${u}&text=${t}`], ['x', 'X', `https://twitter.com/intent/tweet?text=${t}&url=${u}`],
+    ['fb', 'Facebook', `https://www.facebook.com/sharer/sharer.php?u=${u}`], ['mail', 'Email', `mailto:?subject=${encodeURIComponent('Play Lock It with me')}&body=${both}`], ['sms', 'SMS', `sms:?&body=${both}`]];
+  return `<div class="sharebar">${links.map(([c, n, h]) => `<a class="sh ${c}" href="${esc(h)}" target="_blank" rel="noopener">${n}</a>`).join('')}
+    <button type="button" class="sh copy" data-copy="${esc(url)}">Copy link</button>${navigator.share ? `<button type="button" class="sh more" data-share="${esc(url)}" data-text="${esc(text)}">More…</button>` : ''}</div>`;
+}
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-copy]'), m = e.target.closest('[data-share]');
+  if (c) { navigator.clipboard?.writeText(c.dataset.copy).then(() => toast('Link copied'), () => toast(c.dataset.copy)); }
+  if (m) navigator.share({ title: 'Lock It', text: m.dataset.text, url: m.dataset.share }).catch(() => {});
+});
 
 function draw(s) {
-  app.classList.toggle('fit', !isTv() && s.phase === 'question'); // phone question = exactly one screen, no scrolling
+  app.classList.toggle('fit', !isTv() && s.phase === 'question' && (s.game === 'map' || s.game === 'dahi')); // map / option rounds: exactly one screen
   ({ lobby, question, reveal, final })[s.phase](s);
   $('#lobby') && ($('#lobby').onclick = () => post('lobby', { room: me.room, token: me.token }));
   document.querySelectorAll('[data-game]').forEach(b => b.onclick = () => { const g = b.dataset.game, rounds = +$(`[data-rounds="${g}"]`).value;
@@ -123,23 +157,22 @@ function draw(s) {
 function lobby(s) {
   if (isTv()) {
     html(`<div class="lobby"><div class="card stack rise" style="align-items:center;text-align:center">
-        <span class="logo">Lock <span class="accent">It</span></span><div class="qr" id="qr"></div>
+        ${LOGO}<div class="qr" id="qr"></div>
         <p class="muted">Scan to join, or open <b style="color:var(--cream)">${esc(location.host)}</b> and enter</p>
-        <div class="tiles">${[...s.code].map((ch, i) => `<span class="pop" style="--d:${.1 + i * .08}s">${ch}</span>`).join('')}</div></div>
-      <div class="stack"><div class="row rise" style="--d:.1s"><h2 style="font-size:36px">Who’s playing</h2><span class="muted" id="count"></span></div>${pills()}${gameCards()}</div></div>`);
+        <div class="tiles">${[...s.code].map((ch, i) => `<span class="pop" style="--d:${.1 + i * .08}s">${ch}</span>`).join('')}</div>
+        <span class="label">Friends somewhere else? Send the link</span>${shareBar(joinUrl(s.code), `Join my Lock It game! Room ${s.code}:`)}</div>
+      <div class="stack"><div class="row rise" style="--d:.1s"><h2 class="h-sec">Who’s playing</h2><span class="muted" id="count"></span></div>${pills()}${gameCards()}</div></div>`);
     new QRCode($('#qr'), { text: joinUrl(s.code), width: 212, height: 212, colorDark: '#231A40', colorLight: '#FFF4E2' });
   } else if (isHost()) { // online host
-    html(`<div class="row rise"><span class="logo">Lock <span class="accent">It</span></span><span class="pill">Room ${s.code}</span></div>
-      <div class="card stack rise" style="--d:.05s"><h2>Invite your friends</h2><p class="muted">Send them this link. They can join from anywhere.</p>
-        <div class="share"><input id="link" readonly value="${esc(joinUrl(s.code))}" aria-label="Invite link"><button class="small" id="copy">Copy</button></div>
-        ${navigator.share ? '<button class="ghost" id="shareBtn">Share invite</button>' : ''}</div>
+    html(`<div class="row rise">${LOGO}<span class="pill">Room ${s.code}</span></div>
+      <div class="card stack rise" style="--d:.05s"><h2>Invite your friends</h2><p class="muted">Send them the link on any app. They can join from anywhere.</p>
+        <input id="link" readonly value="${esc(joinUrl(s.code))}" aria-label="Invite link" onfocus="this.select()">${shareBar(joinUrl(s.code), `${me.name} invited you to play Lock It! Room ${s.code}:`)}</div>
       <div class="row rise" style="--d:.1s"><h2>Who’s playing</h2><span class="muted" id="count"></span></div>${pills()}${gameCards()}`);
-    $('#copy').onclick = () => { $('#link').select(); navigator.clipboard?.writeText(joinUrl(s.code)); $('#copy').textContent = 'Copied!'; };
-    $('#shareBtn') && ($('#shareBtn').onclick = () => navigator.share({ title: 'Lock It', text: `${me.name} invited you to play! Room ${s.code}`, url: joinUrl(s.code) }));
   } else {
     html(`<div class="stack rise" style="margin-top:6vh;align-items:center;text-align:center"><div class="check">${CHECK}</div>
       <h1 class="hero">You’re in, ${esc(mine()?.name || me.name)}!</h1><p class="muted">Waiting for ${esc(s.host || 'the host')} to pick a game…</p></div>
-      <div class="row rise" style="--d:.1s"><span class="label">Players</span><span class="muted" id="count"></span></div>${pills()}`);
+      <div class="row rise" style="--d:.1s"><span class="label">Players</span><span class="muted" id="count"></span></div>${pills()}
+      <div class="card stack rise" style="--d:.15s"><span class="label">Bring more friends</span>${shareBar(joinUrl(s.code), `Join our Lock It game! Room ${s.code}:`)}</div>`);
   }
 }
 
@@ -169,6 +202,7 @@ function question(s) {
       <div class="ask">${s.game === 'dahi' ? `<div class="stack">${promptBlock(s)}${optTiles(s)}</div>` : promptBlock(s)}<div class="card stack rise" style="--d:.1s"><div class="row"><b>Locked in</b><b style="color:var(--teal)" id="count"></b></div>${pills('list')}</div></div>`);
     photoFallback(s); return timer(s);
   }
+  if (mine()?.answered) return lockedView(); // already answered this round (refreshed / reconnected)
   // phone: online players also need the prompt, same-room players look at the host screen
   const ask = online() ? promptBlock(s) : `<h1 class="rise" style="font-size:28px">${s.game === 'dahi' ? 'Read the puzzle on the host screen' : s.game === 'face' ? 'Pehchaan kaun? Read the clue on the host screen' : s.game === 'num' ? esc(s.prompt) : s.photoOnly ? 'Where’s the place on the host screen?' : `Where is ${esc(s.prompt)}?`}</h1>`;
   const short = s.game === 'dahi' ? 'Dimaag Ka Dahi' : s.game === 'face' ? 'Pehchaan Kaun' : s.game === 'num' ? 'Andaaza' : s.mode === 'circle' ? 'Circle round' : 'Pin round';
@@ -177,13 +211,14 @@ function question(s) {
     html(`${top}<div class="opts pick">${s.options.map((o, i) => `<button class="opt o${i}" data-pick="${i}"><b>${LETTERS[i]}</b><span>${esc(o)}</span></button>`).join('')}</div>`);
     document.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { guess = +b.dataset.pick; b.classList.add('chosen'); submit(); });
   } else if (s.game === 'face') {
-    html(`${top}<form id="f" class="stack rise" style="--d:.1s"><input id="g" type="text" autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="words" enterkeyhint="done" maxlength="60" placeholder="Who is it?" aria-label="Celebrity name" required><button>Lock it in</button></form>`);
-    $('#g').focus();
+    html(`${top}<form id="f" class="stack rise" style="--d:.1s"><input id="g" type="text" autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="words" enterkeyhint="send" maxlength="60" placeholder="Who is it?" aria-label="Celebrity name" required><button>Lock it in</button></form>`);
+    if (!coarse()) $('#g').focus();
     $('#f').onsubmit = e => { e.preventDefault(); guess = $('#g').value.trim(); if (guess) submit(); };
   } else if (s.game === 'num') {
-    html(`${top}<form id="f" class="stack rise" style="--d:.1s"><input id="g" type="number" inputmode="decimal" enterkeyhint="done" step="any" placeholder="Your andaaza${s.unit ? ' (' + esc(s.unit) + ')' : ''}" aria-label="Your answer" required><button>Lock it in</button></form>`);
-    $('#g').focus();
-    $('#f').onsubmit = e => { e.preventDefault(); guess = +$('#g').value; submit(); };
+    html(`${top}<form id="f" class="stack rise" style="--d:.1s"><input id="g" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="send" placeholder="Your andaaza${s.unit ? ' (' + esc(s.unit) + ')' : ''}" aria-label="Your answer" required><button>Lock it in</button></form>`);
+    if (!coarse()) $('#g').focus();
+    // "1,983", "₹ 450", " 7 " all count; commas and spaces are ignored
+    $('#f').onsubmit = e => { e.preventDefault(); const v = $('#g').value.replace(/[^\d.\-]/g, ''); guess = v === '' ? null : parseFloat(v); submit(); };
   } else {
     const circle = s.mode === 'circle';
     html(`${top}<div id="m" class="map rise" style="--d:.08s"></div>
@@ -203,9 +238,18 @@ function question(s) {
   timer(s);
 }
 async function submit() {
-  if (guess == null || guess === '' || Number.isNaN(guess)) return;
-  const k = key, r = await post('answer', { room: me.room, id: me.id, secret: me.secret, guess });
-  if (r.error || key !== k) return; // the reveal can arrive before our own reply: don't cover it
+  if (guess == null || guess === '' || Number.isNaN(guess)) return toast(S.game === 'num' ? 'Type a number first' : S.game === 'map' ? 'Tap the map to drop your pin' : 'Type a name first');
+  const k = key, btns = [...document.querySelectorAll('#s, #f button, [data-pick]')], label = $('#s, #f button');
+  btns.forEach(b => b.disabled = true); if (label) label.textContent = 'Locking in…';
+  const r = await post('answer', { room: me.room, id: me.id, secret: me.secret, guess }, 4);
+  if (key !== k) return; // the reveal arrived before our own reply: don't cover it
+  if (r.error) { // say what happened and let them try again
+    btns.forEach(b => { b.disabled = false; b.classList.remove('chosen'); }); if (label) label.textContent = 'Lock it in';
+    return toast(r.error === 'not now' ? 'Time’s up for this round' : r.error === 'offline' ? 'No connection. Tap Lock it in again.' : 'That didn’t go through. Try again.');
+  }
+  lockedView();
+}
+function lockedView() {
   clearInterval(tick); maps.forEach(m => m.remove()); maps = []; buzz(40); app.classList.remove('fit');
   html(`${lobbyBtn()}<div class="locked"><div class="check">${CHECK}</div><h1 class="hero">Locked in!</h1>
     <p class="muted">${online() ? 'Waiting for the others…' : 'Eyes on the host screen.'}</p></div>${online() ? `<div class="row"><span class="label">Answered</span><span class="muted" id="count"></span></div>${pills()}` : ''}`);
@@ -232,6 +276,7 @@ function reveal(s) {
       <span class="label rise">${!you ? 'Too slow!' : dahi ? (you.exact ? 'Dimaag ka dahi nahi hua!' : `Dahi ho gaya! It was “${r.answer}”`) : face ? (you.exact ? 'Sahi jawab! Perfect spelling' : p ? `Close! It’s spelled ${r.name}` : `It was ${r.name}`) : you.exact ? 'Bang on!' : map && you.guess.radius ? (p ? 'Inside your circle!' : 'Missed your circle') : `${detail(you)}`}</span>
       <div class="points slam ${p ? '' : 'zero'}" style="--d:.15s" data-count="${p}" data-prefix="+">+0</div>
       <div class="row rise" style="--d:.35s;justify-content:center"><span class="pill">Total ${fmt(tot)}</span><span class="pill" style="background:var(--gold);color:var(--gold-ink)">#${rank} of ${S.players.length}</span></div></div>
+      <div class="answer-chip rise" style="--d:.2s"><span class="label">The answer</span><b>${esc(map || face ? r.name : dahi ? r.answer : fmt(r.answer) + (r.unit ? ' ' + r.unit : ''))}</b></div>
       ${online() ? full : dahi ? board + fact : fact}`);
     if (you?.exact || (p && you === r.results[0])) confetti();
   }
@@ -255,7 +300,8 @@ function scale(r) {
 function final(s) {
   const board = [...s.players].sort((a, b) => b.score - a.score), rank = board.findIndex(p => p.id === me.id) + 1;
   const list = `<div class="board">${board.map((p, i) => `<div class="rise" style="--d:${.15 + i * .06}s"><span class="n">${i + 1}</span><span>${esc(p.name)}</span><span data-count="${p.score}">0</span></div>`).join('')}</div>`;
-  const again = isHost() ? `<p class="center muted">Play again?</p>${gameCards()}` : `<p class="center muted">Waiting for ${esc(s.host || 'the host')}…</p>`;
+  const again = (isHost() ? `<p class="center muted">Play again?</p>${gameCards()}` : `<p class="center muted">Waiting for ${esc(s.host || 'the host')}…</p>`)
+    + `<div class="card stack"><span class="label">Had fun? Share Lock It</span>${shareBar(location.origin, 'We just played Lock It. Think you can beat us? Play here:')}</div>`;
   if (isTv()) html(`${lobbyBtn()}<h1 class="big slam">${esc(board[0]?.name || 'Nobody')} wins!</h1>${list}${again}`);
   else html(`${lobbyBtn()}<h1 class="big slam">${rank === 1 ? 'You win!' : '#' + rank}</h1><p class="center muted rise">${fmt(mine()?.score ?? 0)} points</p>${list}${again}`);
   if (isTv() || rank === 1) confetti();
@@ -271,10 +317,11 @@ function countUp() {
 function confetti() {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const box = Object.assign(document.createElement('div'), { className: 'confetti' });
-  box.innerHTML = Array.from({ length: 40 }, () => `<i style="left:${Math.random() * 100}vw;background:${['#F7A83E', '#34C6B3', '#FF8A7A', '#FFF4E2'][Math.random() * 4 | 0]}; animation-delay:${Math.random() * .8}s; animation-duration:${2 + Math.random() * 1.5}s"></i>`).join('');
+  box.innerHTML = Array.from({ length: 40 }, () => `<i style="left:${Math.random() * 100}vw;background:${['#FFB547', '#2EE6C5', '#FF5E8A', '#8B7BFF', '#FFF4E2'][Math.random() * 4 | 0]}; animation-delay:${Math.random() * .8}s; animation-duration:${2 + Math.random() * 1.5}s"></i>`).join('');
   app.append(box); setTimeout(() => box.remove(), 4500);
 }
 
 // ---------- start ----------
-if (!me.name) nameScreen(); else if (me.room) connect(); else if (linkRoom) join(linkRoom); else home();
+save(); // keep the device id
+if (!me.name) nameScreen(); else if (me.room) connect(true); else if (linkRoom) join(linkRoom); else home();
 </script></body></html>

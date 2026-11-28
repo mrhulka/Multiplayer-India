@@ -27,6 +27,16 @@ assert.strictEqual(quizPoints(true, 0, 30000), 1000); assert.strictEqual(quizPoi
 assert.strictEqual(quizPoints(true, 15000, 30000), 750); assert.strictEqual(quizPoints(false, 10, 30000), 0);
 for (const q of Q.dahi) assert(q[3] && new Set([q[1], ...q[2]]).size === 4, 'bad puzzle: ' + q[0]);
 
+// rejoining: same device -> same seat; same name while offline -> same seat; same name while online -> a new player
+const { api, getRoom } = require('./game');
+{ const { code } = api.room(null, { play: 'tv', name: 'Host' }), r = getRoom(code), conn = id => r.clients.add({ pid: id, write() {} });
+  const a = api.join(r, { name: 'Priya', device: 'dev-1' }); conn(a.id);
+  assert.strictEqual(api.join(r, { name: 'Priya', device: 'dev-1' }).id, a.id, 'same device rejoins its seat');
+  assert.notStrictEqual(api.join(r, { name: 'priya ', device: 'dev-2' }).id, a.id, 'a second online Priya is a new player');
+  r.clients.clear(); // everyone dropped off
+  assert.strictEqual(api.join(r, { name: 'PRIYA', device: 'dev-9' }).id, a.id, 'same name while offline takes the seat back');
+  assert.strictEqual(Object.keys(r.players).length, 2); }
+
 // question bank sanity
 const dup = a => a.filter((x, i) => a.indexOf(x) !== i);
 assert.deepStrictEqual(dup(Q.map.map(p => p.name)), []);

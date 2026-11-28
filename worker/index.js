@@ -2,6 +2,7 @@
 import game from '../game.js';
 import page from '../public/index.html';
 import css from '../public/style.css';
+import og from '../public/og.png';
 import india from '../public/india-states.json';
 const indiaJson = JSON.stringify(india);
 // ponytail: the two static files are bundled into the Worker; switch to Workers static assets if public/ grows images
@@ -10,15 +11,15 @@ const indiaJson = JSON.stringify(india);
 export class Hub {
   constructor(ctx) {
     ctx.blockConcurrencyWhile(async () => game.useSeen(await ctx.storage.get('seen'), s => ctx.storage.put('seen', s)));
-    setInterval(game.ping, 25000);
+    setInterval(game.ping, 10000);
   }
   async fetch(req) {
     const u = new URL(req.url), json = (o, status = 200) => Response.json(o, { status });
     if (u.pathname === '/api/events') {
       const r = game.getRoom(u.searchParams.get('room')); if (!r) return json({ error: 'no room' }, 404);
       const { readable, writable } = new TransformStream(), w = writable.getWriter(), enc = new TextEncoder();
-      const c = { write: s => w.write(enc.encode(s)).catch(() => r.clients.delete(c)) };
-      r.clients.add(c); c.write(game.snapshot(r));
+      const c = { pid: u.searchParams.get('id'), write: s => w.write(enc.encode(s)).catch(() => r.clients.delete(c)) };
+      r.clients.add(c); w.closed.catch(() => r.clients.delete(c)); c.write(game.snapshot(r)); // stream closed by the device -> offline right away
       return new Response(readable, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', 'x-accel-buffering': 'no' } });
     }
     if (req.method !== 'POST') return json({ error: 'not found' }, 404);
@@ -43,6 +44,7 @@ export default {
     const { pathname } = new URL(req.url);
     if (pathname.startsWith('/photos/')) return servePhoto(req, env, ctx, pathname.slice(8));
     if (pathname.startsWith('/api/')) return env.HUB.get(env.HUB.idFromName('global-apac'), { locationHint: 'apac' }).fetch(req);
+    if (pathname === '/og.png') return new Response(og, { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' } });
     if (pathname === '/india-states.json') return new Response(indiaJson, { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=86400' } });
     return pathname === '/style.css' ? file(css, 'text/css; charset=utf-8') : file(page, 'text/html; charset=utf-8'); // every other path is the app
   },

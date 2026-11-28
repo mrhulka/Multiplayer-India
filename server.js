@@ -9,7 +9,7 @@ const server = http.createServer((req, res) => {
   if (u.pathname === '/api/events') {
     const r = game.getRoom(u.searchParams.get('room')); if (!r) return json(404, { error: 'no room' });
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', 'x-accel-buffering': 'no' });
-    r.clients.add(res); req.on('close', () => r.clients.delete(res)); res.write(game.snapshot(r)); return;
+    res.pid = u.searchParams.get('id'); r.clients.add(res); req.on('close', () => r.clients.delete(res)); res.write(game.snapshot(r)); return;
   }
   if (u.pathname.startsWith('/api/') && req.method === 'POST') {
     let body = ''; req.on('data', d => { body += d; if (body.length > 4096) req.destroy(); });
@@ -18,9 +18,9 @@ const server = http.createServer((req, res) => {
   const pub = u.pathname.startsWith('/photos/') ? __dirname : path.join(__dirname, 'public');
   const file = path.join(pub, ['/', '/play'].includes(u.pathname) ? 'index.html' : path.normalize(u.pathname));
   if (!file.startsWith(pub)) return json(403, {});
-  fs.readFile(file, (e, d) => e ? json(404, {}) : (res.writeHead(200, { 'content-type': { html: 'text/html', css: 'text/css', json: 'application/json', jpg: 'image/jpeg' }[file.split('.').pop()] || 'text/plain' }), res.end(d)));
+  fs.readFile(file, (e, d) => e ? json(404, {}) : (res.writeHead(200, { 'content-type': { html: 'text/html', css: 'text/css', json: 'application/json', jpg: 'image/jpeg', png: 'image/png' }[file.split('.').pop()] || 'text/plain' }), res.end(d)));
 });
-setInterval(game.ping, 25000).unref();
+setInterval(game.ping, 10000).unref();
 
 if (require.main === module) {
   const port = process.env.PORT || 3000;

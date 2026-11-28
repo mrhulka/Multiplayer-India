@@ -5,8 +5,9 @@ const Q = require('./questions');
 const slug = n => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const photo = q => q?.img ? `/photos/${slug(q.name)}.jpg` : undefined;
 const ROUNDS = 8, MIN_ROUNDS = 3, MAX_ROUNDS = 20, EXACT_BONUS = 200, MIN_R = 25, MAX_R = 1000;
-// per game: seconds to answer, seconds the results stay up before the next question
-const CFG = { map: { ask: 25000, reveal: 10000 }, num: { ask: 25000, reveal: 3000 }, face: { ask: 25000, reveal: 6000 }, dahi: { ask: 30000, reveal: 8000 } };
+// per game: ms to answer, ms the results stay up before the next question
+const CFG = { map: { ask: 25000, reveal: 5000 }, num: { ask: 25000, reveal: 5000 }, face: { ask: 25000, reveal: 5000 }, dahi: { ask: 30000, reveal: 5000 } };
+const GRACE = 1500; // answers sent right at the buzzer still count (network delay)
 const rooms = {};
 // No-repeat: remember every question asked (across rooms and restarts) and only deal unseen ones until the bank runs out.
 // ponytail: one history per server, which suits a household; key it per room or group if many groups share a server
@@ -63,7 +64,7 @@ function ask(r) {
   r.q = r.deck[r.round++]; markSeen(r.game, r.q); r.answers = {}; r.reveal = null; r.phase = 'question'; r.askedAt = Date.now(); r.endsAt = r.askedAt + cfg(r).ask;
   r.mode = r.game === 'map' && r.round % 2 === 0 ? 'circle' : 'pin'; // alternate pin / circle rounds
   if (r.game === 'dahi') r.opts = shuffle([r.q[1], ...r.q[2]]);
-  clearTimeout(r.timer); r.timer = setTimeout(() => reveal(r), cfg(r).ask); send(r);
+  clearTimeout(r.timer); r.timer = setTimeout(() => reveal(r), cfg(r).ask + GRACE); send(r);
 }
 function reveal(r) {
   clearTimeout(r.timer);
@@ -93,13 +94,20 @@ function reveal(r) {
 }
 
 const host = (r, b) => { if (b.token !== r.token) throw 'not host'; };
+// a player is "live" while a device of theirs holds an open update stream (clients carry the player id they connected with)
+const live = (r, id) => [...r.clients].some(c => c.pid === id);
+// reveal early once every connected player has answered (someone who dropped off doesn't hold the round up)
+const allIn = r => Object.keys(r.players).every(id => id in r.answers || !live(r, id)) && Object.keys(r.answers).length > 0;
 const api = {
   // play 'tv': this device is the big screen; 'online': no shared screen, the host plays from their own device too
   room(_, b) { let code; do code = Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[randInt(24)]).join(''); while (rooms[code]);
     const r = rooms[code] = { code, play: b.play === 'online' ? 'online' : 'tv', host: String(b.name || '').trim().slice(0, 16), token: crypto.randomUUID(), phase: 'lobby', players: {}, answers: {}, clients: new Set(), round: 0 };
     return { code, token: r.token, play: r.play, ...(r.play === 'online' ? api.join(r, b) : {}) }; },
-  join(r, b) { const name = String(b.name || '').trim().slice(0, 16); if (!name) throw 'name required';
-    const id = crypto.randomUUID(), secret = crypto.randomUUID(); r.players[id] = { name, score: 0, secret }; send(r); return { id, secret }; },
+  // joining again puts you back in your own seat: same device, or same name while that player is offline
+  join(r, b) { const name = String(b.name || '').trim().slice(0, 16), device = String(b.device || '').slice(0, 64); if (!name) throw 'name required';
+    const seat = Object.entries(r.players).find(([id, p]) => (device && p.device === device) || (norm(p.name) === norm(name) && !live(r, id)));
+    if (seat) { const [id, p] = seat; p.name = name; p.device = device || p.device; send(r); return { id, secret: p.secret }; }
+    const id = crypto.randomUUID(), secret = crypto.randomUUID(); r.players[id] = { name, score: 0, secret, device }; send(r); return { id, secret }; },
   start(r, b) { host(r, b); if (!Object.hasOwn(CFG, b.game)) throw 'bad game';
     r.rounds = Math.min(MAX_ROUNDS, Math.max(MIN_ROUNDS, Math.round(+b.rounds) || ROUNDS));
     r.game = b.game; r.round = 0; r.deck = deal(b.game, r.rounds);
@@ -114,7 +122,7 @@ const api = {
       if (r.mode === 'circle') g.radius = Math.min(MAX_R, Math.max(MIN_R, +b.guess?.radius));
       if (!(r.game === 'map' ? Object.values(g) : [g]).every(Number.isFinite)) throw 'bad guess';
     }
-    r.answers[b.id] = g; if (Object.keys(r.answers).length === Object.keys(r.players).length) reveal(r); else send(r); return {}; },
+    r.answers[b.id] = g; if (allIn(r)) reveal(r); else send(r); return {}; },
 };
 
 const getRoom = code => rooms[String(code || '').toUpperCase()];
@@ -128,7 +136,7 @@ function call(name, b) {
   if (fn !== api.room && !r) throw 'no room';
   return fn(r, b);
 }
-// keep idle SSE connections alive through proxies
-const ping = () => Object.values(rooms).forEach(r => r.clients.forEach(c => c.write(': ping\n\n')));
+// heartbeat: keeps idle streams open through proxies, and lets devices notice a dead stream and reconnect
+const ping = () => Object.values(rooms).forEach(r => r.clients.forEach(c => c.write(`event: ping\ndata: ${Date.now()}\n\n`)));
 
-module.exports = { quizPoints, spellPoints, slug, call, getRoom, snapshot, ping, useSeen, km, rankPoints, circlePoints, deal, markSeen, ROUNDS };
+module.exports = { api, live, quizPoints, spellPoints, slug, call, getRoom, snapshot, ping, useSeen, km, rankPoints, circlePoints, deal, markSeen, ROUNDS };
