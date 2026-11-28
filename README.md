@@ -24,7 +24,7 @@ Refreshing the page puts you back into your game.
 
 - **Dimaag Ka Dahi**: 64 brain-teasers (twisted family relationships, sneaky maths, trick questions) with four options each. The three wrong options are the answers your brain wants to jump to. Right answers score 1000 down to 500 by speed; wrong scores 0. The reveal explains the trick.
 
-The host picks the number of rounds (3–20) for each game in the lobby. Timing: AtaaPataa 25 s to answer and 10 s of results; Andaaza Apna Apna 25 s and the next question 3 s after the reveal; Pehchaan Kaun 25 s and 6 s; Dimaag Ka Dahi 30 s and 8 s. The host can go **Back to lobby** at any time and start the other game with the same players.
+The host picks the number of rounds (3–20) for each game in the lobby. Timing: 25 s to answer (Dimaag Ka Dahi 30 s), then 5 s of results before the next question. Answers made in the last 1.5 s still count. The host can go **Back to lobby** at any time and start the other game with the same players.
 **Question bank:** `questions.js` has 310 places, with coordinates checked against Wikipedia and 263 hand-reviewed photos (78 of them photo-only rounds), (enough for 38 games) and 431 Andaaza Apna Apna questions (enough for 53 games). Questions never repeat until the whole bank has been used. The server records every question it asks in `seen.json`, and that record survives restarts. Delete `seen.json` to start over. No dependencies. `npm test` checks the scoring.
 
 ## Cloudflare
