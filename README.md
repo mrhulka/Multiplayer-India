@@ -29,7 +29,7 @@ The host picks the number of rounds (3–20) for each game in the lobby. Timing:
 
 ## Cloudflare
 
-Live at **https://desi-party-games.sajeshsoman6.workers.dev**. Place photos are self-hosted: `photos/` holds all 263 (about 1000 px wide), the Worker serves them from Workers KV (`PHOTOS` binding) through Cloudflare's cache, and the local server serves the folder directly. The same game runs on Cloudflare Workers (`worker/index.js` + `wrangler.jsonc`). The two page files are bundled into the Worker, and every room lives in one Durable Object. Rooms are kept in memory, so a game in progress is lost if Cloudflare restarts the Durable Object, which happens when nobody has been connected for a while. The no-repeat history is saved in Durable Object storage.
+Live at **https://inmyopinion.in** (also https://desi-party-games.sajeshsoman6.workers.dev). Place photos are self-hosted: `photos/` holds all 263 (about 1000 px wide), the Worker serves them from Workers KV (`PHOTOS` binding) through Cloudflare's cache, and the local server serves the folder directly. The same game runs on Cloudflare Workers (`worker/index.js` + `wrangler.jsonc`). The two page files are bundled into the Worker, and every room lives in one Durable Object. Rooms are kept in memory, so a game in progress is lost if Cloudflare restarts the Durable Object, which happens when nobody has been connected for a while. The no-repeat history is saved in Durable Object storage.
 
 ```bash
 npm install
