@@ -1,10 +1,10 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0E0A24">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#FBF8F3">
 <title>Lock It · game night with your friends, wherever they are</title>
 <meta name="description" content="Multiplayer game night with your friends, wherever they are. Same room or different cities, everyone plays on their phone. No app needed.">
 <meta property="og:title" content="Lock It · game night with your friends, wherever they are"><meta property="og:description" content="AtaaPataa, Andaaza Apna Apna, Pehchaan Kaun and Dimaag Ka Dahi. Open on a laptop or TV, play on your phones. No app needed.">
 <meta property="og:image" content="https://inmyopinion.in/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -23,20 +23,19 @@ async function post(p, b, tries = 3) {
 const toast = msg => { $('.toast')?.remove(); const t = Object.assign(document.createElement('div'), { className: 'toast', role: 'status', textContent: msg }); document.body.append(t); setTimeout(() => t.remove(), 3200); };
 const fmt = n => Math.abs(n) >= 10000 ? n.toLocaleString('en-IN') : String(n);
 const ico = d => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
-const PIN = ico('<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>');
-const BARS = ico('<path d="M3 17h18M6 17v-3M12 17V9M18 17v-6"/>');
-const TV = ico('<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/>');
-const GLOBE = ico('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>');
-const PHONE = ico('<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>');
 const LOCK = '<svg class="lockmark" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.6"/></svg>';
-const LOGO = `<span class="logo">${LOCK}Lock <span class="accent">It</span></span>`;
+const LOGO = `<span class="logo"><span class="lockbox">${LOCK}</span>Lock It</span>`;
+// one flat sticker per game
+const GLYPH = { map: '<svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z" fill="#FBF8F3" stroke="#1C1A24" stroke-width="1.2" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.6" fill="#1C1A24"/></svg>',
+  num: '<span class="gl-num" aria-hidden="true">1983?</span>',
+  face: '<svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8l-5 4v-4H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" fill="#FBF8F3" stroke="#1C1A24" stroke-width="1.1" stroke-linejoin="round"/><path d="M10 9.2a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3" fill="none" stroke="#1C1A24" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="14.2" r=".8" fill="#1C1A24"/></svg>',
+  dahi: '<svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c0-1.5 1.5-2 2.5-1s.5 3.5-2 3.5-4-2-3.5-4.5S12.5 6 15 6.5s4.5 3 4 6-3.5 6-7.5 5.5S5 14.5 5.5 11 9 4.5 12 4.5" fill="none" stroke="#1C1A24" stroke-width="1.6" stroke-linecap="round"/></svg>' };
+const ARROW = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 const CHECK = ico('<path d="M5 12.5l4.5 4.5L19 7.5"/>');
-const BRAIN = ico('<path d="M9 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a2 2 0 0 0-3-2z"/><path d="M15 3a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>');
-const FACE = ico('<path d="M4 6h16v10H8l-4 4z"/><path d="M10 9.5a2 2 0 1 1 2.5 1.9c-.3.1-.5.4-.5.7V13M12 14.8v.2"/>');
-const GAMES = { map: { name: 'AtaaPataa', icon: PIN, tone: '', blurb: 'Find the place on the map of India. Pin it, or gamble on a tight circle.' },
-                num: { name: 'Andaaza Apna Apna', icon: BARS, tone: 'teal', blurb: 'Guess the number. Closest wins, bang on earns +200.' },
-                face: { name: 'Pehchaan Kaun', icon: FACE, tone: 'guava', blurb: 'Read the clue, type the Bollywood star’s name. Perfect spelling scores most.' },
-                dahi: { name: 'Dimaag Ka Dahi', icon: BRAIN, tone: 'muted', blurb: 'Twisted rishte, sneaky maths, trick questions. Four options, all of them tempting.' } };
+const GAMES = { map: { name: 'AtaaPataa', blurb: 'Drop a pin on the map of India. Closest pin wins, or gamble on a tight circle.' },
+                num: { name: 'Andaaza Apna Apna', blurb: 'Guess the number. Closest wins, bang on earns +200.' },
+                face: { name: 'Pehchaan Kaun', blurb: 'One little-known fact. Type the Bollywood star’s name. Perfect spelling scores most.' },
+                dahi: { name: 'Dimaag Ka Dahi', blurb: 'Twisted rishte, sneaky maths, trick questions. Four options, all of them tempting.' } };
 const LETTERS = 'ABCD';
 const ROUND_OPTS = [3, 5, 8, 10, 15, 20];
 const savedRounds = g => { try { return +localStorage['dpg-rounds-' + g] || 8; } catch { return 8; } };
@@ -54,30 +53,37 @@ const isHost = () => !!me.token, isTv = () => isHost() && S?.play === 'tv', onli
 const tiles = name => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/${name}/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 16, attribution: 'Tiles © Esri' });
 // India's states (official boundaries), bundled with the game. Guessing map: states only, no base map, no labels.
 let statesP; const states = () => statesP ||= fetch('/india-states.json').then(r => r.json());
-const addStates = (m, fill) => states().then(S => L.polygon(S.flat().map(ring => [ring]), { color: '#8E7FB8', weight: 1, fill, fillColor: '#FFF4E2', fillOpacity: 1, interactive: false, renderer: L.canvas() }).addTo(m)); // one canvas layer: far cheaper than 400 SVG paths
-const PIN_SVG = c => `<svg viewBox="0 0 24 32" width="30" height="40" aria-hidden="true"><path d="M12 31s10-11 10-19A10 10 0 0 0 2 12c0 8 10 19 10 19z" fill="${c}" stroke="#231A40" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#231A40"/></svg>`;
-const pinIcon = (c = '#FFB547') => L.divIcon({ className: 'pin', html: PIN_SVG(c), iconSize: [30, 40], iconAnchor: [15, 39], tooltipAnchor: [0, -32] });
+const addStates = (m, fill) => states().then(S => L.polygon(S.flat().map(ring => [ring]), { color: '#A39C8E', weight: 1, fill, fillColor: '#FFFFFF', fillOpacity: 1, interactive: false, renderer: L.canvas() }).addTo(m)); // one canvas layer: far cheaper than 400 SVG paths
+const PIN_SVG = c => `<svg viewBox="0 0 24 32" width="30" height="40" aria-hidden="true"><path d="M12 31s10-11 10-19A10 10 0 0 0 2 12c0 8 10 19 10 19z" fill="${c}" stroke="#1C1A24" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#1C1A24"/></svg>`;
+const pinIcon = (c = '#FF8A3D') => L.divIcon({ className: 'pin', html: PIN_SVG(c), iconSize: [30, 40], iconAnchor: [15, 39], tooltipAnchor: [0, -32] });
 const buzz = ms => navigator.vibrate?.(ms);
 const INDIA = [[6.5, 68.1], [35.6, 97.4]];
 const joinUrl = code => `${location.origin}/?room=${code}`;
 
 // ---------- entry: name first, then create or join ----------
+const STICKERS = `<div class="stickers" aria-hidden="true">${['map', 'num', 'face', 'dahi'].map(g => `<div class="stk g-${g}">${GLYPH[g]}</div>`).join('')}<span class="tag t1">${CHECK}Locked in!</span><span class="tag t2">+1000</span></div>`;
+const heroCopy = inner => `<section class="hero"><div class="stack hero-copy rise"><span class="eyebrow">4 games · no app · just phones</span>
+  <h1 class="display-xl">Phones out.<br>Game on.</h1><p class="lede">Game night with your friends, wherever they are. Everyone answers on their phone. Fastest and closest wins.</p>${inner}</div>${STICKERS}</section>`;
 function nameScreen() {
-  html(`<div class="stack rise hello">${LOGO}<p class="tagline">Game night with your friends, wherever they are.</p><h1 class="hero">Aa jao!</h1><p class="muted">First things first. What should we call you?</p></div>
-    <form id="f" class="card stack rise" style="--d:.1s"><label>Your name<input id="n" maxlength="16" autocomplete="nickname" value="${esc(me.name)}" required></label>
-    <button>Let’s go</button></form>`);
+  document.body.className = 'web';
+  html(`<header class="site-head rise">${LOGO}</header>` + heroCopy(`<form id="f" class="stack namebox"><label for="n">First things first. What should we call you?</label>
+    <div class="inline"><input id="n" maxlength="16" autocomplete="nickname" placeholder="Your name" value="${esc(me.name)}" required><button>Let’s go</button></div></form>`));
   if (!coarse()) $('#n').focus();
   $('#f').onsubmit = e => { e.preventDefault(); me.name = $('#n').value.trim(); if (!me.name) return; save(); linkRoom ? join(linkRoom) : home(); };
 }
 function home(msg = '') {
-  document.body.className = 'phone';
-  html(`<div class="row rise">${LOGO}<button class="small ghost" id="rename">${esc(me.name)} · change</button></div>
-    ${msg ? `<p class="card center rise">${esc(msg)}</p>` : ''}
-    <h1 class="rise" style="--d:.05s">Hey ${esc(me.name)}, start a game</h1>
-    <button class="choice rise" style="--d:.1s" data-play="tv"><span class="icon">${TV}</span><span><b>Same room</b><br><span class="muted">Put this screen where everyone can see it: a laptop, TV or tablet. Everyone scans a QR code with their phone.</span></span></button>
-    <button class="choice rise" style="--d:.16s" data-play="online"><span class="icon teal">${GLOBE}</span><span><b>Play online</b><br><span class="muted">Get a link to share. Everyone plays on their own device, wherever they are.</span></span></button>
-    <form id="j" class="card stack rise" style="--d:.22s"><label>Got a room code?<input id="c" class="code" maxlength="4" autocomplete="off" required></label><button class="ghost">Join</button><p id="err" class="center accent" role="alert"></p></form>
-    <div class="card stack rise" style="--d:.28s"><span class="label">Tell your friends about Lock It</span>${shareBar(location.origin, 'Game night with your friends, wherever they are. Play Lock It:')}</div>`);
+  document.body.className = 'web';
+  const steps = [['map', 'Open it on a big screen', 'A laptop or TV in the room, or just send the link.'], ['num', 'Friends join on their phones', 'Scan the QR or open the link. Type a name and they’re in.'], ['dahi', 'Lock it in', '25 seconds a question. Answers and points show on every screen.']];
+  html(`<header class="site-head rise">${LOGO}<nav><a href="#games">Games</a><a href="#how">How it works</a><button class="who" id="rename"><span class="av">${esc(me.name[0].toUpperCase())}</span>${esc(me.name)}</button></nav></header>`
+    + heroCopy(`${msg ? `<p class="card">${esc(msg)}</p>` : ''}<div class="modes">
+      <button class="mode" data-play="tv"><b>Same room ${ARROW}</b><small>This screen hosts, phones scan a QR</small></button>
+      <button class="mode ghost" data-play="online"><b>Play online ${ARROW}</b><small>Share a link, friends join from anywhere</small></button></div>
+      <form id="j" class="codebox"><label for="c">Got a room code?</label><input id="c" class="code" maxlength="4" autocomplete="off" placeholder="ABCD" required><button>Join</button><p id="err" class="accent" role="alert"></p></form>`)
+    + `<section id="games" class="band"><div class="section"><div class="section-head"><h2>Pick your poison</h2><p>3 to 20 rounds a game. Questions don’t repeat for weeks.</p></div>
+      <div class="showcase">${Object.entries(GAMES).map(([g, x]) => `<article class="show g-${g}"><div class="top">${GLYPH[g]}</div><div class="txt"><h3>${x.name}</h3><p>${x.blurb}</p></div></article>`).join('')}</div></div></section>
+    <section id="how" class="section pad"><div class="section-head"><h2>Three steps, zero setup</h2></div>
+      <ol class="steps">${steps.map(([g, t, d], i) => `<li class="g-${g}"><span class="n">${i + 1}</span><div><b>${t}</b><span class="txt">${d}</span></div></li>`).join('')}</ol></section>
+    <footer class="site-foot"><span class="muted">Lock It · ${esc(location.host)}</span>${shareBar(location.origin, 'Game night with your friends, wherever they are. Play Lock It:')}</footer>`);
   $('#rename').onclick = nameScreen;
   document.querySelectorAll('[data-play]').forEach(b => b.onclick = () => create(b.dataset.play));
   $('#j').onsubmit = e => { e.preventDefault(); join($('#c').value.trim().toUpperCase()); };
@@ -108,7 +114,7 @@ const coarse = () => matchMedia('(pointer: coarse)').matches; // touch screens: 
 function render(s) {
   S = s; if (s.now) skew = s.now - Date.now(); // countdowns follow the server's clock, not this device's
   if (s.next) new Image().src = s.next; // preload the next question's photo during the results screen
-  document.body.className = isTv() ? 'tv' : 'phone';
+  document.body.className = isTv() ? 'tv' : isHost() && s.phase === 'lobby' ? 'wide' : 'phone';
   const k = [s.phase, s.round, s.game].join();
   if (k !== key) { key = k; guess = null; clearInterval(tick); maps.forEach(m => m.remove()); maps = []; draw(s); }
   syncChips($('#pills'), s.players, s.phase === 'question');
@@ -121,15 +127,17 @@ function syncChips(el, players, showDone) {
   const have = new Map([...el.children].map(c => [c.dataset.id, c]));
   for (const p of players) {
     let c = have.get(p.id);
-    if (!c) { c = Object.assign(document.createElement('span'), { className: 'chip', textContent: p.name }); c.dataset.id = p.id; el.append(c); }
+    if (!c) { c = Object.assign(document.createElement('span'), { className: 'chip', textContent: p.name }); c.dataset.id = p.id; c.dataset.i = (p.name[0] || '?').toUpperCase(); el.append(c); }
     have.delete(p.id); c.classList.toggle('done', showDone && p.answered); c.classList.toggle('wait', showDone && !p.answered);
   }
   have.forEach(c => c.remove());
 }
 const mine = () => S.players.find(p => p.id === me.id);
 const lobbyBtn = () => isHost() ? '<button class="small ghost corner" id="lobby">Back to lobby</button>' : '';
-const gameCards = () => `<div class="games">${Object.entries(GAMES).map(([g, x], i) => `<div class="game g-${g} rise" style="--d:${.1 + i * .06}s"><span class="icon ${x.tone}">${x.icon}</span><h2>${x.name}</h2><span class="muted">${x.blurb}</span>
-  <div class="go-row"><label class="rounds">Rounds<select data-rounds="${g}">${ROUND_OPTS.map(n => `<option${n === savedRounds(g) ? ' selected' : ''}>${n}</option>`).join('')}</select></label><button class="go" data-game="${g}" ${S.players.length ? '' : 'disabled'}>Start</button></div></div>`).join('')}</div>`;
+const lobbyInline = () => isHost() ? '<button class="small ghost" id="lobby">Back to lobby</button>' : '';
+const gname = s => `<span class="gname g-${s.game}"><span class="mini">${GLYPH[s.game]}</span>${GAMES[s.game].name}</span>`;
+const gameCards = () => `<div class="games">${Object.entries(GAMES).map(([g, x], i) => `<div class="game g-${g} rise" style="--d:${.1 + i * .06}s"><div class="game-head"><h2>${x.name}</h2><span class="glyph">${GLYPH[g]}</span></div><p class="blurb">${x.blurb}</p>
+  <div class="go-row"><button class="go" data-game="${g}" ${S.players.length ? '' : 'disabled'}>Start</button><label class="rounds"><select data-rounds="${g}" aria-label="Rounds for ${x.name}">${ROUND_OPTS.map(n => `<option value="${n}"${n === savedRounds(g) ? ' selected' : ''}>${n} rounds</option>`).join('')}</select></label></div></div>`).join('')}</div>`;
 const pills = (cls = '') => `<div class="chips ${cls}" id="pills"></div>`;
 // share to any platform: links for the big ones, the phone's own share sheet for everything else, and copy
 function shareBar(url, text) {
@@ -155,22 +163,22 @@ function draw(s) {
 }
 
 function lobby(s) {
+  const players = `<aside class="card stack players rise" style="--d:.1s"><div class="row"><h2>Players</h2><span class="muted" id="count"></span></div>${pills('list')}<p class="muted">New players pop in here the moment they join.</p></aside>`;
+  const picker = `<div class="stack picker"><div class="row rise" style="--d:.05s"><h1 class="h-sec">Pick a game</h1><span class="muted">Set the rounds, then hit Start</span></div>${gameCards()}</div>`;
   if (isTv()) {
-    html(`<div class="lobby"><div class="card stack rise" style="align-items:center;text-align:center">
-        ${LOGO}<div class="qr" id="qr"></div>
-        <p class="muted">Scan to join, or open <b style="color:var(--cream)">${esc(location.host)}</b> and enter</p>
+    html(`<header class="site-head rise">${LOGO}<span class="muted">Hosted by ${esc(s.host || me.name)} · Same room</span></header>
+      <div class="lobby"><aside class="card stack join rise"><span class="label">Join on your phone</span><div class="qr" id="qr"></div>
+        <p class="muted">or open <b style="color:var(--ink)">${esc(location.host)}</b> and type</p>
         <div class="tiles">${[...s.code].map((ch, i) => `<span class="pop" style="--d:${.1 + i * .08}s">${ch}</span>`).join('')}</div>
-        <span class="label">Friends somewhere else? Send the link</span>${shareBar(joinUrl(s.code), `Join my Lock It game! Room ${s.code}:`)}</div>
-      <div class="stack"><div class="row rise" style="--d:.1s"><h2 class="h-sec">Who’s playing</h2><span class="muted" id="count"></span></div>${pills()}${gameCards()}</div></div>`);
-    new QRCode($('#qr'), { text: joinUrl(s.code), width: 212, height: 212, colorDark: '#231A40', colorLight: '#FFF4E2' });
+        <div class="far"><span class="label">Someone not in the room? Send the link</span>${shareBar(joinUrl(s.code), `Join my Lock It game! Room ${s.code}:`)}</div></aside>${picker}${players}</div>`);
+    new QRCode($('#qr'), { text: joinUrl(s.code), width: 212, height: 212, colorDark: '#1C1A24', colorLight: '#FFFFFF' });
   } else if (isHost()) { // online host
-    html(`<div class="row rise">${LOGO}<span class="pill">Room ${s.code}</span></div>
-      <div class="card stack rise" style="--d:.05s"><h2>Invite your friends</h2><p class="muted">Send them the link on any app. They can join from anywhere.</p>
-        <input id="link" readonly value="${esc(joinUrl(s.code))}" aria-label="Invite link" onfocus="this.select()">${shareBar(joinUrl(s.code), `${me.name} invited you to play Lock It! Room ${s.code}:`)}</div>
-      <div class="row rise" style="--d:.1s"><h2>Who’s playing</h2><span class="muted" id="count"></span></div>${pills()}${gameCards()}`);
+    html(`<header class="site-head rise">${LOGO}<span class="pill">Room ${s.code}</span></header>
+      <div class="lobby"><aside class="card stack join invite rise"><h2>Invite your friends</h2><p class="muted">Send the link on any app. They can join from anywhere.</p>
+        <input id="link" readonly value="${esc(joinUrl(s.code))}" aria-label="Invite link" onfocus="this.select()">${shareBar(joinUrl(s.code), `${me.name} invited you to play Lock It! Room ${s.code}:`)}</aside>${picker}${players}</div>`);
   } else {
     html(`<div class="stack rise" style="margin-top:6vh;align-items:center;text-align:center"><div class="check">${CHECK}</div>
-      <h1 class="hero">You’re in, ${esc(mine()?.name || me.name)}!</h1><p class="muted">Waiting for ${esc(s.host || 'the host')} to pick a game…</p></div>
+      <h1>You’re in, ${esc(mine()?.name || me.name)}!</h1><p class="muted">Waiting for ${esc(s.host || 'the host')} to pick a game…</p></div>
       <div class="row rise" style="--d:.1s"><span class="label">Players</span><span class="muted" id="count"></span></div>${pills()}
       <div class="card stack rise" style="--d:.15s"><span class="label">Bring more friends</span>${shareBar(joinUrl(s.code), `Join our Lock It game! Room ${s.code}:`)}</div>`);
   }
@@ -178,7 +186,7 @@ function lobby(s) {
 
 const left = s => Math.max(0, (s.endsAt - (Date.now() + skew)) / 1000);
 function timer(s) {
-  const t = () => { const l = Math.ceil(left(s)); $('#t') && ($('#t').textContent = l); document.querySelector('.ring, .drain')?.classList.toggle('low', l <= 5); };
+  const t = () => { const l = Math.ceil(left(s)); $('#t') && ($('#t').textContent = l); document.querySelectorAll('.clock, .drain').forEach(e => e.classList.toggle('low', l <= 5)); };
   t(); tick = setInterval(t, 250);
 }
 const anim = s => `animation-duration:${s.secs}s;animation-delay:${-(s.secs - left(s))}s`;
@@ -186,20 +194,19 @@ const dots = s => `<div class="dots" aria-label="Round ${s.round} of ${s.total}"
 const howTo = s => s.game === 'dahi' ? 'Pick one · faster right answers score more' : s.game === 'face' ? 'Type the name · exact spelling scores most' : s.game === 'num' ? 'Type your andaaza' : s.mode === 'circle' ? 'Circle round · smaller circle, more points' : 'Pin round · closest wins';
 const optTiles = s => `<div class="opts">${s.options.map((o, i) => `<div class="opt o${i}"><b>${LETTERS[i]}</b><span>${esc(o)}</span></div>`).join('')}</div>`;
 function promptBlock(s) {
-  if (s.game === 'dahi') return `<div class="card prompt clue rise"><span class="label">Dimaag Ka Dahi</span><h2>${esc(s.prompt)}</h2></div>`;
-  if (s.game === 'face') return `<div class="card prompt clue rise"><span class="label">Pehchaan kaun?</span><h2>${esc(s.prompt)}</h2></div>`;
-  if (s.game === 'num') return `<div class="card prompt rise"><h2>${esc(s.prompt)}${s.unit ? ` <span class="muted">(${esc(s.unit)})</span>` : ''}</h2></div>`;
+  if (s.game === 'dahi') return `<div class="card prompt clue panel g-dahi rise"><span class="label">Dimaag Ka Dahi</span><h2>${esc(s.prompt)}</h2></div>`;
+  if (s.game === 'face') return `<div class="card prompt clue panel g-face rise"><span class="label">Pehchaan kaun?</span><h2>${esc(s.prompt)}</h2></div>`;
+  if (s.game === 'num') return `<div class="card prompt panel g-num rise"><span class="label">Type a number on your phone</span><h2>${esc(s.prompt)}${s.unit ? ` <span class="label">(${esc(s.unit)})</span>` : ''}</h2></div>`;
   const q = s.photoOnly ? 'Where is this?' : `Where is ${esc(s.prompt)}?`;
-  return s.img ? `<div class="photo"><img src="${esc(s.img)}" alt=""><h2>${q}</h2></div>` : `<div class="card prompt rise"><h2>${q}</h2></div>`;
+  return s.img ? `<div class="photo"><img src="${esc(s.img)}" alt=""><h2>${q}</h2></div>` : `<div class="card prompt panel g-map rise"><h2>${q}</h2></div>`;
 }
 // photo failed to load: turn the photo box into a plain question card (and name the place on photo-only rounds)
-const photoFallback = s => { const im = $('.photo img'); if (im) im.onerror = () => { const ph = $('.photo'); im.remove(); ph.className = 'card prompt'; ph.querySelector('h2').textContent = `Where is ${s.prompt}?`; }; };
+const photoFallback = s => { const im = $('.photo img'); if (im) im.onerror = () => { const ph = $('.photo'); im.remove(); ph.className = 'card prompt panel g-map'; ph.querySelector('h2').textContent = `Where is ${s.prompt}?`; }; };
 
 function question(s) {
   if (isTv()) {
-    html(`${lobbyBtn()}<div class="topbar rise"><div class="row"><span class="logo">${GAMES[s.game].name}</span><span class="pill">${howTo(s)}</span></div>
-      <div class="row">${dots(s)}<div class="ring"><svg viewBox="0 0 90 90"><circle cx="45" cy="45" r="38" class="track"/><circle cx="45" cy="45" r="38" class="bar" style="${anim(s)}"/></svg><span id="t"></span></div></div></div>
-      <div class="ask">${s.game === 'dahi' ? `<div class="stack">${promptBlock(s)}${optTiles(s)}</div>` : promptBlock(s)}<div class="card stack rise" style="--d:.1s"><div class="row"><b>Locked in</b><b style="color:var(--teal)" id="count"></b></div>${pills('list')}</div></div>`);
+    html(`<div class="topbar g-${s.game} rise">${gname(s)}${dots(s)}<span class="pill">${howTo(s)}</span><span class="clock"><b id="t"></b><small>sec</small></span>${lobbyInline()}</div><div class="drain"><i style="${anim(s)}"></i></div>
+      <div class="ask">${s.game === 'dahi' ? `<div class="stack">${promptBlock(s)}${optTiles(s)}</div>` : promptBlock(s)}<aside class="card stack rise" style="--d:.1s"><div class="row"><h2>Locked in</h2><h2 id="count"></h2></div>${pills('list')}<p class="muted">The answer shows the moment everyone locks in.</p></aside></div>`);
     photoFallback(s); return timer(s);
   }
   if (mine()?.answered) return lockedView(); // already answered this round (refreshed / reconnected)
@@ -229,7 +236,7 @@ function question(s) {
     addStates(m, true); m.attributionControl.addAttribution('Boundaries: india-maps-data');
     let pin, ring;
     const upd = () => { if (!pin) return; guess = { ...pin.getLatLng(), radius: circle ? +$('#r').value : undefined };
-      if (circle) { ring ? ring.setLatLng(guess).setRadius(guess.radius * 1000) : (ring = L.circle(guess, { radius: guess.radius * 1000, color: '#F7A83E', weight: 3, fillOpacity: .2 }).addTo(m)); }
+      if (circle) { ring ? ring.setLatLng(guess).setRadius(guess.radius * 1000) : (ring = L.circle(guess, { radius: guess.radius * 1000, color: '#FF8A3D', weight: 3, fillOpacity: .2 }).addTo(m)); }
       $('#s').disabled = false; $('#s').textContent = 'Lock it in'; };
     m.on('click', e => { pin ? pin.setLatLng(e.latlng) : (pin = L.marker(e.latlng, { icon: pinIcon() }).addTo(m)); buzz(15); upd(); });
     if (circle) $('#r').oninput = () => { const v = +$('#r').value; $('#rl').textContent = v; $('#rp').textContent = `up to ${Math.max(100, 1000 - v)} pts`; upd(); };
@@ -251,7 +258,7 @@ async function submit() {
 }
 function lockedView() {
   clearInterval(tick); maps.forEach(m => m.remove()); maps = []; buzz(40); app.classList.remove('fit');
-  html(`${lobbyBtn()}<div class="locked"><div class="check">${CHECK}</div><h1 class="hero">Locked in!</h1>
+  html(`${lobbyBtn()}<div class="locked"><div class="check">${CHECK}</div><h1>Locked in!</h1>
     <p class="muted">${online() ? 'Waiting for the others…' : 'Eyes on the host screen.'}</p></div>${online() ? `<div class="row"><span class="label">Answered</span><span class="muted" id="count"></span></div>${pills()}` : ''}`);
   syncChips($('#pills'), S.players, true);
 }
@@ -266,16 +273,16 @@ function reveal(s) {
   const detail = x => dahi ? (x.exact ? `right in ${(x.ms / 1000).toFixed(1)}s` : `picked “${x.guess}”`) : face ? (x.exact ? 'spelled perfectly' : `typed “${x.guess}”`) : map ? `${fmt(x.err)} km off${x.guess.radius ? ` · ${Math.round(x.guess.radius)} km circle` : ''}` : x.exact ? 'bang on! +200' : `off by ${fmt(x.err)}`;
   const cards = r.results.length ? `<div class="results">${r.results.map((x, i) => `<div class="res rise ${i === 0 && x.points ? 'best' : ''}" style="--d:${.25 + i * .05}s"><b>${esc(x.name)}</b><span class="pts" data-count="${x.points}" data-prefix="+">+0</span><small>${esc(detail(x))}</small></div>`).join('')}</div>` : '<p class="card center muted">Nobody answered!</p>';
   const board = dahi ? `<div class="opts">${r.options.map((o, i) => `<div class="opt o${i} ${i === r.right ? 'right' : 'wrong'} rise" style="--d:${.05 + i * .04}s"><b>${i === r.right ? '✓' : LETTERS[i]}</b><span>${esc(o)}<small>${esc(r.picks[i].join(', '))}</small></span></div>`).join('')}</div>` : '';
-  const full = `${head}${map ? '<div id="m" class="map rise"></div>' : face ? '' : dahi ? board : scale(r)}${fact}${cards}`;
-  const bar = `<div class="topbar rise"><span class="logo">${GAMES[s.game].name}</span><span class="muted">Round ${s.round} of ${s.total}</span></div>`;
-  if (isTv()) html(lobbyBtn() + bar + full);
+  const middle = map ? '<div id="m" class="map rise"></div>' : face ? '' : dahi ? board : scale(r), full = `${head}${middle}${fact}${cards}`;
+  const bar = `<div class="topbar g-${s.game} rise">${gname(s)}<span class="muted">Round ${s.round} of ${s.total}</span><span class="clock"><small>Next question in a few seconds</small></span>${lobbyInline()}</div>`;
+  if (isTv()) html(`${bar}<div class="split"><div class="card stack stage">${head}${middle}${fact}</div><aside class="stack scoreboard"><h2>This round</h2>${cards}</aside></div>`);
   else {
     const p = you?.points ?? 0, tot = mine()?.score ?? 0;
     const rank = [...S.players].sort((a, b) => b.score - a.score).findIndex(x => x.id === me.id) + 1;
-    html(`${lobbyBtn()}<div class="stack" style="align-items:center;text-align:center;padding-top:20px">
+    html(`${lobbyBtn()}<div class="result-panel g-${s.game}">
       <span class="label rise">${!you ? 'Too slow!' : dahi ? (you.exact ? 'Dimaag ka dahi nahi hua!' : `Dahi ho gaya! It was “${r.answer}”`) : face ? (you.exact ? 'Sahi jawab! Perfect spelling' : p ? `Close! It’s spelled ${r.name}` : `It was ${r.name}`) : you.exact ? 'Bang on!' : map && you.guess.radius ? (p ? 'Inside your circle!' : 'Missed your circle') : `${detail(you)}`}</span>
       <div class="points slam ${p ? '' : 'zero'}" style="--d:.15s" data-count="${p}" data-prefix="+">+0</div>
-      <div class="row rise" style="--d:.35s;justify-content:center"><span class="pill">Total ${fmt(tot)}</span><span class="pill" style="background:var(--gold);color:var(--gold-ink)">#${rank} of ${S.players.length}</span></div></div>
+      <div class="row rise" style="--d:.35s;justify-content:center"><span class="pill">Total ${fmt(tot)}</span><span class="pill rank">#${rank} of ${S.players.length}</span></div></div>
       <div class="answer-chip rise" style="--d:.2s"><span class="label">The answer</span><b>${esc(map || face ? r.name : dahi ? r.answer : fmt(r.answer) + (r.unit ? ' ' + r.unit : ''))}</b></div>
       ${online() ? full : dahi ? board + fact : fact}`);
     if (you?.exact || (p && you === r.results[0])) confetti();
@@ -283,10 +290,10 @@ function reveal(s) {
   if (map && $('#m')) {
     const m = L.map('m'), pts = [[r.answer.lat, r.answer.lng]]; maps.push(m);
     tiles('World_Street_Map').addTo(m); addStates(m, false);
-    L.circleMarker(pts[0], { radius: 12, color: '#34C6B3', fillColor: '#34C6B3', fillOpacity: 1 }).addTo(m).bindTooltip(esc(r.name), { permanent: true });
+    L.circleMarker(pts[0], { radius: 12, color: '#1C1A24', weight: 3, fillColor: '#B9E86A', fillOpacity: 1 }).addTo(m).bindTooltip(esc(r.name), { permanent: true });
     r.results.forEach(x => { const p = [x.guess.lat, x.guess.lng]; pts.push(p);
-      L.marker(p, { icon: pinIcon(x.points ? '#F7A83E' : '#FF8A7A') }).addTo(m).bindTooltip(esc(x.name), { permanent: true, direction: 'top' }); L.polyline([pts[0], p], { color: '#F7A83E', dashArray: '6', weight: 3 }).addTo(m);
-      if (x.guess.radius) L.circle(p, { radius: x.guess.radius * 1000, color: x.points ? '#34C6B3' : '#FF8A7A' }).addTo(m); });
+      L.marker(p, { icon: pinIcon(x.points ? '#FF8A3D' : '#FF6FA8') }).addTo(m).bindTooltip(esc(x.name), { permanent: true, direction: 'top' }); L.polyline([pts[0], p], { color: '#1C1A24', dashArray: '6', weight: 2 }).addTo(m);
+      if (x.guess.radius) L.circle(p, { radius: x.guess.radius * 1000, color: x.points ? '#2F7A12' : '#C2263B' }).addTo(m); });
     m.fitBounds(pts, { padding: [40, 40], maxZoom: 7 });
   }
 }
@@ -317,7 +324,7 @@ function countUp() {
 function confetti() {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const box = Object.assign(document.createElement('div'), { className: 'confetti' });
-  box.innerHTML = Array.from({ length: 40 }, () => `<i style="left:${Math.random() * 100}vw;background:${['#FFB547', '#2EE6C5', '#FF5E8A', '#8B7BFF', '#FFF4E2'][Math.random() * 4 | 0]}; animation-delay:${Math.random() * .8}s; animation-duration:${2 + Math.random() * 1.5}s"></i>`).join('');
+  box.innerHTML = Array.from({ length: 40 }, () => `<i style="left:${Math.random() * 100}vw;background:${['#FF8A3D', '#4DA3FF', '#FF6FA8', '#B9E86A', '#1C1A24'][Math.random() * 5 | 0]}; animation-delay:${Math.random() * .8}s; animation-duration:${2 + Math.random() * 1.5}s"></i>`).join('');
   app.append(box); setTimeout(() => box.remove(), 4500);
 }
 
